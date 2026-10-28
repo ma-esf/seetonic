@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seetonic</title>
+<style>
+:root{
+  --green:#16a34a; --green-dark:#15803d; --brown:#312a2a;
+  --warm:#f5f0eb; --gray:#ebebe4; --white:#fff;
+  --leaf-bg:#f0fdf4;
+  --radius:12px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--brown);background:var(--warm)}
+button{font:inherit;color:inherit;cursor:pointer}
+.app{height:100vh;display:flex;flex-direction:column}
+
+/* ---------- stepper ---------- */
+.stepper{background:#fff;border-bottom:1px solid var(--gray);height:56px;display:flex;align-items:center;padding:0 24px;flex-shrink:0;gap:0}
+.step{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px}
+.step-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid var(--gray);color:rgba(49,42,42,.4)}
+.step.active .step-num{background:var(--green);color:#fff;border-color:var(--green)}
+.step.done .step-num{background:#22c55e;color:#fff;border-color:#22c55e}
+.step-name{font-size:14px;color:rgba(49,42,42,.5);white-space:nowrap}
+.step.active .step-name{font-weight:600;color:var(--brown)}
+.step-line{height:1px;width:32px;background:var(--gray)}
+.step-line.done{background:#4ade80}
+
+/* ---------- centred card screens ---------- */
+.center{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:32px;overflow:auto}
+.card{background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:40px;width:100%;max-width:640px}
+h1{font-size:24px;font-weight:600;margin:0 0 4px}
+.sub{font-size:13px;color:rgba(49,42,42,.5);margin:0 0 32px}
+.input{width:100%;padding:9px 12px;border:1px solid var(--gray);border-radius:8px;font-size:14px;outline:none;font-family:inherit}
+.input:focus{border-color:var(--green)}
+.drop{display:block;width:100%;border:2px dashed var(--gray);border-radius:var(--radius);padding:28px;text-align:center;background:#fcfbfa;margin-bottom:12px}
+.drop:hover,.drop.over{border-color:var(--green);background:var(--leaf-bg)}
+.drop .big{display:block;font-size:14px;font-weight:600}
+.drop .small{display:block;font-size:12px;color:rgba(49,42,42,.5);margin-top:4px}
+/* Drag events stay on the zone itself, so crossing its text does not fire dragleave. */
+.drop span{pointer-events:none}
+.file{display:flex;align-items:center;gap:10px;border:1px solid var(--gray);border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:6px;background:#fff}
+.file .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file .sz{font-size:11px;color:rgba(49,42,42,.45)}
+.file .x{border:0;background:none;color:rgba(49,42,42,.35);font-size:15px;line-height:1;padding:2px 4px}
+.file .x:hover{color:#ef4444}
+.actions{display:flex;justify-content:flex-end;gap:12px;margin-top:28px;padding-top:24px;border-top:1px solid var(--gray)}
+.btn{padding:9px 20px;border-radius:8px;border:1px solid var(--gray);background:#fff;font-size:14px}
+.btn:hover{border-color:var(--green)}
+.btn-primary{background:var(--green);color:#fff;border-color:var(--green);font-weight:600}
+.btn-primary:hover{background:var(--green-dark);border-color:var(--green-dark)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;background:var(--green)}
+.spinwrap{display:flex;flex-direction:column;align-items:center;gap:16px;padding:40px 0}
+.spinner{width:64px;height:64px;border-radius:50%;border:3px solid var(--gray);border-top-color:var(--green);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.rot{font-size:13px;color:rgba(49,42,42,.5)}
+.cardfoot{padding-top:24px;border-top:1px solid var(--gray);display:flex;align-items:center;justify-content:space-between}
+.cardfoot .k{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(49,42,42,.3)}
+.cardfoot .v{font-size:14px;font-weight:600}
+.error{border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;border-radius:8px;padding:10px 12px;font-size:13px;margin:16px 0 0;white-space:pre-wrap}
+
+/* ---------- answer and citations ---------- */
+.body{flex:1;display:flex;overflow:hidden}
+.askrow{display:flex;gap:8px}
+.result{margin-top:28px;padding-top:24px;border-top:1px solid var(--gray)}
+.grp-t{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(49,42,42,.5);margin-bottom:8px}
+.answer{font-size:14px;line-height:1.5;white-space:pre-wrap;margin:0 0 24px}
+.flag{border:1px solid var(--gray);border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer}
+.flag:hover{border-color:rgba(22,163,74,.5)}
+.flag.red{border-color:#fecaca;background:#fef2f2}
+.flag.on{border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
+.flag .nm{font-size:12px;font-weight:600;line-height:1.2}
+.flag .m{font-size:12px;color:rgba(49,42,42,.7);margin-top:3px;line-height:1.35}
+.snippet{display:block;max-width:100%;margin-top:8px;border:1px solid var(--gray);border-radius:4px}
+.pill{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 6px;border-radius:4px;margin-bottom:5px}
+.pill.green{background:#dcfce7;color:#15803d}
+.pill.amber{background:#fef3c7;color:#b45309}
+.pill.red{background:#fee2e2;color:#b91c1c}
+
+/* ---------- source panel ---------- */
+.handle{width:6px;flex-shrink:0;cursor:col-resize;border-left:1px solid var(--gray)}
+.handle:hover{background:rgba(22,163,74,.3)}
+.panel{flex-shrink:0;background:#fff;display:flex;flex-direction:column;width:460px}
+.panel-head{background:var(--leaf-bg);border-bottom:1px solid var(--gray);padding:8px 16px;display:flex;flex-direction:column;gap:4px}
+.panel-head .row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.panel-head .k{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(49,42,42,.6)}
+.panel-head .f{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zoom{display:flex;align-items:center;gap:2px}
+.zoom button{border:0;background:none;padding:2px 7px;border-radius:4px;font-size:14px;line-height:1;color:rgba(49,42,42,.6)}
+.zoom button:hover{background:rgba(22,163,74,.12);color:var(--brown)}
+.zoom .pc{font-size:11px;font-variant-numeric:tabular-nums;min-width:40px;text-align:center}
+.nav{display:flex;align-items:center;justify-content:center;gap:12px;padding-top:2px}
+.nav button{border:0;background:none;width:26px;height:26px;border-radius:50%;font-size:16px;line-height:1;color:rgba(49,42,42,.5)}
+.nav button:hover{background:rgba(22,163,74,.15);color:var(--brown)}
+.nav .c{font-size:11px;color:rgba(49,42,42,.7);font-variant-numeric:tabular-nums}
+.mapped{background:var(--leaf-bg);border-bottom:1px solid #bbf7d0;padding:8px 16px;display:flex;align-items:baseline;gap:12px}
+.mapped .k{font-size:11px;font-weight:600;flex-shrink:0}
+.mapped .v{font-size:12px;line-height:1.4;max-height:4.2em;overflow:auto}
+.bar{padding:8px 16px;font-size:12px;line-height:1.4;border-bottom:1px solid}
+.bar.amber{background:#fffbeb;color:#b45309;border-color:#fde68a}
+.bar.red{background:#fef2f2;color:#b91c1c;border-color:#fecaca}
+.pdfscroll{position:relative;flex:1;overflow:auto;background:#f3f4f6;padding:16px}
+/* No padding or border: the image fills the paper, so a percent of the paper is a percent of the image. */
+.paper{position:relative;margin:0 auto;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.16)}
+.paper img{display:block;width:100%}
+.missing{font-size:12px;color:rgba(49,42,42,.6);text-align:center;padding:24px}
+/* content-box and a negative margin put the border outside the box, so it frames the text and covers none of it. */
+.hl{position:absolute;box-sizing:content-box;margin:-2px;border:2px solid var(--green);background:rgba(22,163,74,.12);border-radius:2px;pointer-events:none}
+.hl.approximate{border-style:dashed;border-color:#f59e0b;background:rgba(245,158,11,.12)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stepper">
+    <div class="step active" id="step-upload"><span class="step-num">1</span><span class="step-name">Upload</span></div>
+    <div class="step-line" id="step-line"></div>
+    <div class="step" id="step-ask"><span class="step-num">2</span><span class="step-name">Ask</span></div>
+  </div>
+
+  <div class="center" id="upload-screen">
+    <div class="card">
+      <h1>Ask a PDF</h1>
+      <p class="sub">Upload one PDF, ask it a question, and see the evidence highlighted on its page.</p>
+      <button type="button" class="drop" id="drop">
+        <span class="big">Drag a PDF here, or click to browse</span>
+        <span class="small">One PDF at a time</span>
+      </button>
+      <input type="file" id="picker" accept="application/pdf" hidden>
+      <div class="file" id="file" hidden>
+        <span>📄</span><span class="nm" id="file-name"></span><span class="sz" id="file-size"></span>
+        <button type="button" class="x" id="file-remove" title="Remove">✕</button>
+      </div>
+      <p class="error" id="upload-error" hidden></p>
+      <div class="actions"><button type="button" class="btn btn-primary" id="upload" disabled>Upload</button></div>
+    </div>
+  </div>
+
+  <div class="center" id="progress-screen" hidden>
+    <div class="card">
+      <h1>Reading your PDF</h1>
+      <p class="sub">Every page is rendered and indexed before you can ask, so a long PDF takes up to a minute.</p>
+      <div class="spinwrap"><div class="spinner"></div><p class="rot" id="rot"></p></div>
+      <div class="cardfoot"><div><p class="k">Uploading</p><p class="v" id="progress-name"></p></div></div>
+    </div>
+  </div>
+
+  <div class="body" id="ask-screen" hidden>
+    <div class="center">
+      <div class="card">
+        <h1>Ask a question</h1>
+        <p class="sub" id="doc-line"></p>
+        <form class="askrow" id="ask-form">
+          <input class="input" id="question" placeholder="What does the document say about ...?" autocomplete="off">
+          <button type="submit" class="btn btn-primary" id="ask">Ask</button>
+        </form>
+        <p class="error" id="ask-error" hidden></p>
+        <div class="result" id="result" hidden>
+          <div class="grp-t">Answer</div>
+          <p class="answer" id="answer"></p>
+          <div class="grp-t" id="citations-title"></div>
+          <div id="citations"></div>
+        </div>
+      </div>
+    </div>
+    <div class="handle" id="handle" hidden></div>
+    <div class="panel" id="panel" hidden>
+      <div class="panel-head">
+        <div class="row"><span class="k">PDF source</span>
+          <div class="zoom">
+            <button type="button" data-zoom="-1">−</button>
+            <button type="button" class="pc" data-zoom="0" id="zoom-pc">100%</button>
+            <button type="button" data-zoom="1">+</button>
+            <button type="button" id="close" style="margin-left:6px">✕</button>
+          </div></div>
+        <span class="f" id="panel-page"></span>
+        <div class="nav" id="nav"><button type="button" data-go="-1">‹</button>
+          <span class="c" id="nav-count"></span><button type="button" data-go="1">›</button></div>
+      </div>
+      <div class="mapped"><span class="k">Quote</span><span class="v" id="panel-quote"></span></div>
+      <div class="bar" id="panel-bar" hidden></div>
+      <div class="pdfscroll" id="pdfscroll"></div>
+    </div>
+  </div>
+</div>
+<script>
+/* The answer, each quote and each error message go onto the page as text (textContent or text nodes), never innerHTML.
+   The model copies words from the uploaded PDF, so a quote can hold markup, and innerHTML would run it. */
+
+const $ = sel => document.querySelector(sel);
+const state = {
+  file: null,
+  docId: null,
+  citations: [],
+  open: null,      // index of the citation in the source panel
+  zoom: 1,
+};
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+// The app's own errors are {"detail": "<message>"}. A request validation error (422) has a list of
+// {msg, ...} as its detail. An unhandled error (500) is plain text.
+async function errorMessage(response) {
+  const text = await response.text();
+  try {
+    const detail = JSON.parse(text).detail;
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) return detail.map(item => item.msg).join(" ");
+  } catch {
+    // Not JSON: show the status and the text below.
+  }
+  // Only the start of the text: a proxy's error page can be a whole HTML document.
+  return `Error ${response.status}: ${text.slice(0, 200)}`;
+}
+
+// POST and return the JSON reply. A failed request throws an Error whose message is ready to show.
+async function post(url, options) {
+  let response;
+  try {
+    response = await fetch(url, { method: "POST", ...options });
+  } catch {
+    throw new Error("The server could not be reached.");
+  }
+  if (!response.ok) throw new Error(await errorMessage(response));
+  return response.json();
+}
+
+function showError(node, error) {
+  node.textContent = error ? error.message : "";
+  node.hidden = !error;
+}
+
+function show(screen) {
+  $("#upload-screen").hidden = screen !== "upload";
+  $("#progress-screen").hidden = screen !== "progress";
+  $("#ask-screen").hidden = screen !== "ask";
+  const asking = screen === "ask";
+  $("#step-upload").className = asking ? "step done" : "step active";
+  $("#step-upload .step-num").textContent = asking ? "✓" : "1";
+  $("#step-line").className = asking ? "step-line done" : "step-line";
+  $("#step-ask").className = asking ? "step active" : "step";
+}
+
+/* ---------- 1. upload ---------- */
+const picker = $("#picker"), drop = $("#drop");
+
+// The server checks the file, so a file that is not a PDF is sent and its error shown.
+function choose(file) {
+  state.file = file || null;
+  $("#file").hidden = !file;
+  if (file) {
+    $("#file-name").textContent = file.name;
+    $("#file-size").textContent = (file.size / 1e6).toFixed(1) + " MB";
+  }
+  $("#upload").disabled = !file;
+  showError($("#upload-error"), null);
+}
+
+drop.onclick = () => picker.click();
+// Cleared after each pick, so picking the same file again still fires change.
+picker.onchange = () => { choose(picker.files[0]); picker.value = ""; };
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => {
+  e.preventDefault();
+  drop.classList.remove("over");
+  if (e.dataTransfer.files[0]) choose(e.dataTransfer.files[0]);  // dropped text or a link has no file
+};
+$("#file-remove").onclick = () => choose(null);
+// A file dropped outside the drop zone would make the browser open it and leave the page.
+document.addEventListener("dragover", e => e.preventDefault());
+document.addEventListener("drop", e => e.preventDefault());
+
+const ROTATING = ["Reading the PDF...", "Rendering each page...", "Indexing each page for search...", "Storing the pages..."];
+
+// There is no Cancel: the server keeps storing pages after the browser stops waiting.
+$("#upload").onclick = async () => {
+  const form = new FormData();
+  form.append("file", state.file);
+  $("#progress-name").textContent = state.file.name;
+  let i = 0;
+  $("#rot").textContent = ROTATING[0];
+  const tick = setInterval(() => { i = (i + 1) % ROTATING.length; $("#rot").textContent = ROTATING[i]; }, 3000);
+  show("progress");
+  try {
+    const reply = await post("/upload", { body: form });
+    state.docId = reply.doc_id;
+    $("#doc-line").textContent = `${state.file.name}, ${reply.pages} ${reply.pages === 1 ? "page" : "pages"}`;
+    show("ask");
+    $("#question").focus();
+  } catch (error) {
+    showError($("#upload-error"), error);
+    show("upload");
+  } finally {
+    clearInterval(tick);
+  }
+};
+
+/* ---------- 2. ask ---------- */
+const PILL = { verified: "green", approximate: "amber", unverified: "red" };
+
+// An empty question is sent too: the server rejects it, and its message shows. Trimmed, so only spaces count as empty.
+$("#ask-form").onsubmit = async e => {
+  e.preventDefault();
+  const button = $("#ask");
+  button.disabled = true;
+  button.textContent = "Asking...";
+  showError($("#ask-error"), null);
+  $("#result").hidden = true;
+  closePanel();
+  try {
+    const reply = await post("/ask", {
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ doc_id: state.docId, question: $("#question").value.trim() }),
+    });
+    showAnswer(reply);
+  } catch (error) {
+    showError($("#ask-error"), error);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Ask";
+  }
+};
+
+function showAnswer(reply) {
+  state.citations = reply.citations;
+  // The model marks bold with ** as Markdown does.
+  const answer = $("#answer");
+  const parts = reply.answer.split("**");
+  if (parts.length % 2 === 0) {
+    // An odd number of ** leaves one without a partner, which would swap bold and plain: show the answer as it came.
+    answer.textContent = reply.answer;
+  } else {
+    // The part between each pair of ** goes in a <strong>. Every part goes in as text.
+    answer.replaceChildren();
+    parts.forEach((part, i) => answer.append(i % 2 === 1 ? el("strong", "", part) : part));
+  }
+  $("#citations-title").textContent = `Citations (${reply.citations.length})`;
+  $("#citations").replaceChildren(...reply.citations.map((citation, index) => {
+    const card = el("div", citation.status === "unverified" ? "flag red" : "flag");
+    card.append(
+      el("span", "pill " + PILL[citation.status], citation.status),
+      el("div", "nm", `Page ${citation.page}`),
+      el("div", "m", `“${citation.quote}”`),
+    );
+    if (citation.snippet_url) {
+      const snippet = el("img", "snippet");
+      snippet.alt = `Snippet from page ${citation.page}`;
+      snippet.onerror = () => snippet.remove();
+      snippet.src = citation.snippet_url;
+      card.append(snippet);
+    }
+    card.onclick = () => openPanel(index);
+    return card;
+  }));
+  $("#result").hidden = false;
+}
+
+/* ---------- source panel ---------- */
+const WARNINGS = {
+  approximate: "Approximate: this page has no text layer, so the box is the model's estimate and can sit beside the text.",
+  unverified: "Unverified: the server could not confirm the quote on this page, so nothing is highlighted.",
+};
+
+function openPanel(index) {
+  state.open = index;
+  const citation = state.citations[index];
+  document.querySelectorAll("#citations .flag").forEach((card, i) => card.classList.toggle("on", i === index));
+  $("#panel-page").textContent = `${state.file.name}, page ${citation.page}`;
+  $("#nav").hidden = state.citations.length < 2;
+  $("#nav-count").textContent = `${index + 1} of ${state.citations.length}`;
+  $("#panel-quote").textContent = citation.quote;
+  const bar = $("#panel-bar");
+  bar.className = "bar " + PILL[citation.status];
+  bar.textContent = WARNINGS[citation.status] || "";
+  bar.hidden = !WARNINGS[citation.status];
+
+  const paper = el("div", "paper");
+  paper.style.width = state.zoom * 100 + "%";
+  const image = el("img");
+  image.alt = `Page ${citation.page}`;
+  image.onload = () => {
+    if (!paper.isConnected) return;  // a slow page from a citation the user has already left
+    paper.append(...citation.boxes.map(box => highlight(box, image, citation.status)));
+    showFirstBox();
+  };
+  // The model can name a page the document does not have, and /files then answers 404.
+  image.onerror = () => paper.replaceWith(el("p", "missing", `Page ${citation.page} could not be loaded.`));
+  image.src = `/files/${state.docId}/pages/${citation.page}.png`;
+  paper.append(image);
+  $("#pdfscroll").replaceChildren(paper);
+  $("#pdfscroll").scrollTo(0, 0);  // a page with no box starts at its top, not where the last page was scrolled
+  $("#handle").hidden = false;
+  $("#panel").hidden = false;
+}
+
+// A box is [x0, y0, x1, y1] in page-image pixels. It is placed in percent of the image's natural size,
+// so it stays on the text when zoom, the panel drag or a window resize changes the image's displayed size.
+function highlight([x0, y0, x1, y1], image, status) {
+  const box = el("div", "hl " + status);
+  box.style.left = x0 / image.naturalWidth * 100 + "%";
+  box.style.top = y0 / image.naturalHeight * 100 + "%";
+  box.style.width = (x1 - x0) / image.naturalWidth * 100 + "%";
+  box.style.height = (y1 - y0) / image.naturalHeight * 100 + "%";
+  return box;
+}
+
+// Bring the first box into view. Only the page area scrolls: scrollIntoView would also scroll the clipped screen.
+function showFirstBox() {
+  const scroller = $("#pdfscroll"), paper = scroller.querySelector(".paper"), first = scroller.querySelector(".hl");
+  if (!first) return;
+  scroller.scrollTop = paper.offsetTop + first.offsetTop - scroller.clientHeight / 2;
+  scroller.scrollLeft = paper.offsetLeft + first.offsetLeft - scroller.clientWidth / 2;
+}
+
+function closePanel() {
+  state.open = null;
+  $("#handle").hidden = true;
+  $("#panel").hidden = true;
+  document.querySelectorAll("#citations .flag.on").forEach(card => card.classList.remove("on"));
+}
+
+// The boxes are in percent of the paper, so a new paper width needs no redraw.
+function zoom(step) {
+  state.zoom = step === 0 ? 1 : Math.min(2.5, Math.max(0.5, state.zoom + step * 0.25));
+  $("#zoom-pc").textContent = Math.round(state.zoom * 100) + "%";
+  const paper = $("#pdfscroll .paper");
+  if (paper) paper.style.width = state.zoom * 100 + "%";
+  showFirstBox();
+}
+
+document.querySelectorAll("[data-zoom]").forEach(button => button.onclick = () => zoom(+button.dataset.zoom));
+// ‹ and › step to the previous or next citation, and wrap around at either end.
+document.querySelectorAll("[data-go]").forEach(button => button.onclick = () => {
+  const count = state.citations.length;
+  const step = Number(button.dataset.go);
+  openPanel((state.open + step + count) % count);
+});
+$("#close").onclick = closePanel;
+
+// Pointer capture sends every move and the release to the handle, even when the pointer leaves the window.
+const handle = $("#handle");
+handle.onpointerdown = e => {
+  e.preventDefault();
+  handle.setPointerCapture(e.pointerId);
+  const startX = e.clientX, startWidth = $("#panel").offsetWidth;
+  handle.onpointermove = ev => {
+    $("#panel").style.width = Math.min(900, Math.max(320, startWidth + startX - ev.clientX)) + "px";
+  };
+};
+handle.onlostpointercapture = () => { handle.onpointermove = null; };
+</script>
+</body>
+</html>
