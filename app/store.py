@@ -7,6 +7,7 @@ from app import config
 bucket = storage.Client(project=config.PROJECT).bucket(config.BUCKET)
 bq = bigquery.Client(project=config.PROJECT, location=config.DATA_LOCATION)
 PAGES_TABLE = f"{config.PROJECT}.{config.DATASET}.pages"
+QUESTIONS_TABLE = f"{config.PROJECT}.{config.DATASET}.{config.QUESTIONS_TABLE}"
 
 # Exact search: with no vector index, VECTOR_SEARCH compares the query with every row the doc_id pre-filter returns.
 SEARCH_QUERY = f"""
@@ -38,6 +39,16 @@ def insert_pages(rows: list[dict]) -> None:
         autodetect=False, create_disposition=bigquery.CreateDisposition.CREATE_NEVER
     )
     bq.load_table_from_json(rows, PAGES_TABLE, job_config=job_config).result()
+
+
+def log_question(row: dict) -> None:
+    # A streaming insert, not a load job: one row per question would soon use up the daily load-job quota.
+    # Give up within about 10 s: retries stop at 5 s, and the last attempt can run 5 s more. The default retry
+    # runs for 600 s, past Cloud Run's 300 s request timeout, so a slow BigQuery would cost the user the answer.
+    # It reports a rejected row by returning it, not by raising, so raise here.
+    errors = bq.insert_rows_json(QUESTIONS_TABLE, [row], retry=bigquery.DEFAULT_RETRY.with_timeout(5), timeout=5)
+    if errors:
+        raise RuntimeError(f"BigQuery rejected the question row: {errors}")
 
 
 def search_pages(doc_id: str, query_vector: list[float], k: int) -> list[tuple[int, float]]:
