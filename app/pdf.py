@@ -36,3 +36,16 @@ def render_page(pdf_bytes: bytes, page_number: int, dpi: int) -> tuple[bytes, in
     with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
         pixmap = _page(doc, page_number).get_pixmap(dpi=dpi)
     return pixmap.tobytes("png"), pixmap.width, pixmap.height
+
+
+def crop(png: bytes, box: list[float]) -> bytes:
+    """Cut a box [x0, y0, x1, y1], in pixels, out of a PNG, rounding outwards.
+
+    Raises ValueError for a box with no area inside the image.
+    """
+    image = pymupdf.Pixmap(png)
+    clip = pymupdf.Rect(box) & pymupdf.Rect(0, 0, image.width, image.height)
+    # pymupdf crashes the process, not just the call, when the clip has no area inside the image.
+    if clip.is_empty:
+        raise ValueError(f"The box {box} has no area inside the {image.width} x {image.height} image.")
+    return pymupdf.Pixmap(image, image.width, image.height, clip).tobytes("png")
