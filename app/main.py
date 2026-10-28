@@ -1,7 +1,9 @@
 import uuid
+from pathlib import Path
 
 import pymupdf
 from fastapi import FastAPI, HTTPException, Response, UploadFile
+from fastapi.staticfiles import StaticFiles
 from google.api_core.exceptions import NotFound
 from google.genai.errors import APIError
 from pydantic import BaseModel, Field, ValidationError
@@ -94,3 +96,8 @@ def files(path: str) -> Response:
         return Response(store.load_file(path), media_type="image/png")
     except NotFound:
         raise HTTPException(404, "Not found.")
+
+
+# Mounted last: a route declared below this line would be caught by the mount instead.
+# static/ is found beside app/ from this file, so app/ must run from the source tree, not from an installed wheel.
+app.mount("/", StaticFiles(directory=Path(__file__).parent.parent / "static", html=True), name="static")
