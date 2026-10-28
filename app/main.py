@@ -1,4 +1,7 @@
+import sys
+import time
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pymupdf
@@ -53,6 +56,7 @@ def upload(file: UploadFile) -> dict:
 @app.post("/ask")
 def ask(body: Question) -> dict:
     """Answer from the document's top pages. Code, not the model, decides each citation's status and boxes."""
+    start = time.perf_counter()
     try:
         vector = gemini.embed_text(body.question)
     except APIError:
@@ -80,11 +84,22 @@ def ask(body: Question) -> dict:
                 store.save_file(path, pdf.crop(pngs[citation.page], result["boxes"][0]))
                 result["snippet_url"] = f"/files/{path}"
             citations.append(result)
-    return {
-        "answer": reply.answer,
-        "pages": [{"page": page, "score": score} for page, score in scored],
-        "citations": citations,
-    }
+    pages = [{"page": page, "score": score} for page, score in scored]
+    try:
+        store.log_question({
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "doc_id": body.doc_id,
+            "question": body.question,
+            "pages": pages,
+            "statuses": [citation["status"] for citation in citations],
+            "latency_ms": round((time.perf_counter() - start) * 1000),
+            "embed_model": config.EMBEDDING_MODEL,
+            "answer_model": config.FLASH_MODEL,
+        })
+    except Exception as error:
+        # Monitoring must never cost the user the answer, but the failure must show in the logs.
+        print(f"Logging the question failed: {error!r}", file=sys.stderr)
+    return {"answer": reply.answer, "pages": pages, "citations": citations}
 
 
 @app.get("/files/{path:path}")

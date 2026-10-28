@@ -1,4 +1,7 @@
-"""Every setting, read from the environment with a default."""
+"""Every setting, read from the environment with a default.
+
+deploy.sh and setup.sh repeat these defaults: change them there too.
+"""
 
 import os
 
@@ -13,4 +16,5 @@ EMBEDDING_SIZE = int(os.environ.get("EMBEDDING_SIZE", "768"))
 DATA_LOCATION = os.environ.get("DATA_LOCATION", "europe-north1")
 BUCKET = os.environ.get("BUCKET", f"{PROJECT}-files")
 DATASET = os.environ.get("DATASET", "seetonic")
+QUESTIONS_TABLE = os.environ.get("QUESTIONS_TABLE", "questions")
 MAX_PAGES = int(os.environ.get("MAX_PAGES", "50"))
