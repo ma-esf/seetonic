@@ -1,7 +1,7 @@
 import pymupdf
 import pytest
 
-from app.pdf import has_text_layer, page_count, render_page
+from app.pdf import crop, has_text_layer, page_count, render_page
 
 
 def test_page_count_counts_every_page():
@@ -79,3 +79,21 @@ def test_render_page_rejects_a_page_outside_the_document(page_number):
     doc.new_page()
     with pytest.raises(ValueError):
         render_page(doc.tobytes(), page_number, 144)
+
+
+def test_crop_cuts_the_box_out_of_a_png():
+    image = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 100, 50), False)
+    image.clear_with(255)
+    image.set_rect(pymupdf.IRect(10, 5, 40, 25), (0, 0, 0))
+    snippet = pymupdf.Pixmap(crop(image.tobytes("png"), [10, 5, 40, 25]))
+    assert (snippet.width, snippet.height) == (30, 20)
+    assert snippet.pixel(0, 0) == snippet.pixel(29, 19) == (0, 0, 0)
+
+
+@pytest.mark.parametrize(
+    "box", [[0, 0, 0, 0], [40, 25, 10, 5], [200, 200, 300, 300]], ids=["empty", "inverted", "outside"]
+)
+def test_crop_rejects_a_box_with_no_area_inside_the_image(box):
+    image = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 100, 50), False)
+    with pytest.raises(ValueError):
+        crop(image.tobytes("png"), box)
