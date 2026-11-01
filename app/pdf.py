@@ -25,11 +25,10 @@ def _page(doc: pymupdf.Document, page_number: int) -> pymupdf.Page:
     return doc[page_number - 1]
 
 
-def render_page(pdf_bytes: bytes, page_number: int, dpi: int) -> tuple[bytes, int, int]:
-    """Render one page (1-based) to PNG; returns the PNG bytes, width and height in pixels."""
+def render_page(pdf_bytes: bytes, page_number: int, dpi: int) -> bytes:
+    """Render one page (1-based) to PNG."""
     with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
-        pixmap = _page(doc, page_number).get_pixmap(dpi=dpi)
-    return pixmap.tobytes("png"), pixmap.width, pixmap.height
+        return _page(doc, page_number).get_pixmap(dpi=dpi).tobytes("png")
 
 
 def crop(png: bytes, box: list[float]) -> bytes:
