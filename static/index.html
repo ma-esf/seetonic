@@ -56,7 +56,9 @@ h1{font-size:24px;font-weight:600;margin:0 0 4px}
 .spinwrap{display:flex;flex-direction:column;align-items:center;gap:16px;padding:40px 0}
 .spinner{width:64px;height:64px;border-radius:50%;border:3px solid var(--gray);border-top-color:var(--green);animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.rot{font-size:13px;color:rgba(49,42,42,.5)}
+.spinwrap.sm{flex-direction:row;padding:20px 0 0}
+.spinwrap.sm .spinner{width:24px;height:24px}
+.wait{font-size:13px;color:rgba(49,42,42,.5);margin:0}
 .cardfoot{padding-top:24px;border-top:1px solid var(--gray);display:flex;align-items:center;justify-content:space-between}
 .cardfoot .k{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(49,42,42,.3)}
 .cardfoot .v{font-size:14px;font-weight:600}
@@ -67,6 +69,15 @@ h1{font-size:24px;font-weight:600;margin:0 0 4px}
 .askrow{display:flex;gap:8px}
 .result{margin-top:28px;padding-top:24px;border-top:1px solid var(--gray)}
 .grp-t{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(49,42,42,.5);margin-bottom:8px}
+#citations{margin-bottom:24px}
+.trace{list-style:none;margin:0;padding:0;font-size:13px;line-height:24px}
+.trace li{position:relative;display:grid;grid-template-columns:24px 64px 1fr auto;gap:12px;padding-bottom:14px}
+.trace li:last-child{padding-bottom:0}
+.trace li:not(:last-child)::before{content:"";position:absolute;left:11px;top:28px;bottom:4px;width:2px;background:var(--gray)}
+.trace .k{font-weight:600}
+.trace code{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--warm);padding:2px 6px;border-radius:4px}
+.trace .note{font-size:12px;color:rgba(49,42,42,.5)}
+.trace .note.ok{color:var(--green-dark);font-weight:600}
 .answer{font-size:14px;line-height:1.5;white-space:pre-wrap;margin:0 0 24px}
 .flag{border:1px solid var(--gray);border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer}
 .flag:hover{border-color:rgba(22,163,74,.5)}
@@ -142,7 +153,7 @@ h1{font-size:24px;font-weight:600;margin:0 0 4px}
     <div class="card">
       <h1>Reading your PDF</h1>
       <p class="sub">Every page is rendered and indexed before you can ask, so a long PDF takes up to a minute.</p>
-      <div class="spinwrap"><div class="spinner"></div><p class="rot" id="rot"></p></div>
+      <div class="spinwrap"><div class="spinner"></div></div>
       <div class="cardfoot"><div><p class="k">Uploading</p><p class="v" id="progress-name"></p></div></div>
     </div>
   </div>
@@ -156,12 +167,15 @@ h1{font-size:24px;font-weight:600;margin:0 0 4px}
           <input class="input" id="question" placeholder="What does the document say about ...?" autocomplete="off">
           <button type="submit" class="btn btn-primary" id="ask">Ask</button>
         </form>
+        <div class="spinwrap sm" id="ask-wait" hidden><div class="spinner"></div><p class="wait">Waiting for the server's reply...</p></div>
         <p class="error" id="ask-error" hidden></p>
         <div class="result" id="result" hidden>
           <div class="grp-t">Answer</div>
           <p class="answer" id="answer"></p>
           <div class="grp-t" id="citations-title"></div>
           <div id="citations"></div>
+          <div class="grp-t">Decision model outputs</div>
+          <ol class="trace" id="steps"></ol>
         </div>
       </div>
     </div>
@@ -278,28 +292,22 @@ $("#file-remove").onclick = () => choose(null);
 document.addEventListener("dragover", e => e.preventDefault());
 document.addEventListener("drop", e => e.preventDefault());
 
-const ROTATING = ["Reading the PDF...", "Rendering each page...", "Indexing each page for search...", "Storing the pages..."];
-
 // There is no Cancel: the server keeps storing pages after the browser stops waiting.
 $("#upload").onclick = async () => {
   const form = new FormData();
   form.append("file", state.file);
   $("#progress-name").textContent = state.file.name;
-  let i = 0;
-  $("#rot").textContent = ROTATING[0];
-  const tick = setInterval(() => { i = (i + 1) % ROTATING.length; $("#rot").textContent = ROTATING[i]; }, 3000);
   show("progress");
   try {
     const reply = await post("/upload", { body: form });
     state.docId = reply.doc_id;
-    $("#doc-line").textContent = `${state.file.name}, ${reply.pages} ${reply.pages === 1 ? "page" : "pages"}`;
+    // /upload stores every page or fails, so a reply means all of them were rendered, indexed and stored.
+    $("#doc-line").textContent = `${state.file.name}: ${reply.pages} ${reply.pages === 1 ? "page" : "pages"} rendered, indexed for search and stored.`;
     show("ask");
     $("#question").focus();
   } catch (error) {
     showError($("#upload-error"), error);
     show("upload");
-  } finally {
-    clearInterval(tick);
   }
 };
 
@@ -312,6 +320,8 @@ $("#ask-form").onsubmit = async e => {
   const button = $("#ask");
   button.disabled = true;
   button.textContent = "Asking...";
+  // One message for the whole wait: the reply comes in one piece, so the page cannot tell which step is running.
+  $("#ask-wait").hidden = false;
   showError($("#ask-error"), null);
   $("#result").hidden = true;
   closePanel();
@@ -324,6 +334,7 @@ $("#ask-form").onsubmit = async e => {
   } catch (error) {
     showError($("#ask-error"), error);
   } finally {
+    $("#ask-wait").hidden = true;
     button.disabled = false;
     button.textContent = "Ask";
   }
@@ -363,7 +374,27 @@ function showAnswer(reply) {
     card.onclick = () => openPanel(index);
     return card;
   }));
+  $("#steps").replaceChildren(...steps(reply).map(({ name, value, note, ok }, i) => {
+    const step = el("li");
+    const text = el("span");
+    text.append(...value);  // strings become text nodes
+    step.append(el("span", "step-num", String(i + 1)), el("span", "k", name), text, el("span", ok ? "note ok" : "note", note));
+    return step;
+  }));
   $("#result").hidden = false;
+}
+
+// The two routing steps in the server's order, read from the /ask reply alone. A decision that differs from Jev's
+// label came from Flash; when they match, Jev is shown as deciding.
+function steps(reply) {
+  const code = text => el("code", "", text);
+  const flashDecided = reply.decision !== reply.jev_route;
+  return [
+    { name: "Route", ok: !flashDecided, note: flashDecided ? "overruled" : "✓ decided",
+      value: ["Jev: ", code(reply.jev_route), ` ${reply.jev_confidence.toFixed(2)}`] },
+    { name: "Shadow", ok: flashDecided, note: flashDecided ? "✓ decided" : "logged, not used",
+      value: reply.route === "blocked" ? ["Flash: ", code("blocked"), " by the safety filter"] : ["Flash: ", code(reply.route)] },
+  ];
 }
 
 /* ---------- source panel ---------- */

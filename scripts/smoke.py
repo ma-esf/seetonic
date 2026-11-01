@@ -3,7 +3,8 @@
 Usage:
   uv run python scripts/smoke.py <base URL>
 
-Prints PASS and exits 0, or prints FAIL with the first problem (the field, or the route that failed) and exits 1.
+Prints PASS and exits 0, or prints FAIL with the first problem (the endpoint that failed, the decision when /ask did not
+answer, or the citation field) and exits 1.
 """
 
 import sys
@@ -68,6 +69,9 @@ if __name__ == "__main__":
     with httpx.Client(base_url=sys.argv[1].rstrip("/"), timeout=120) as client:
         upload = _post(client, "/upload", files={"file": ("smoke.pdf", one_page_pdf(), "application/pdf")})
         reply = _post(client, "/ask", json={"doc_id": upload["doc_id"], "question": QUESTION})
+    if reply.get("decision") != "answer":
+        # A rejection leaves no citations, and the check below would blame them instead of the routing.
+        sys.exit(f"FAIL: /ask did not answer: decision {reply.get('decision')!r}, Jev {reply.get('jev_route')!r}")
     citations = reply.get("citations")
     failure = contract_failure(citations)
     if failure:

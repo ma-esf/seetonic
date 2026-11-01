@@ -1,4 +1,5 @@
 """Measure retrieval and citations on the labeled set in eval/questions.jsonl: hit@3, MRR@3 and the verification rate.
+A question the router rejects counts as not retrieved.
 
 Usage:
   uv run python scripts/evaluate.py <base URL>
@@ -23,8 +24,10 @@ TOP_K = 3  # the metrics are @3, so the server must keep its default TOP_K
 
 
 def retrieved_pages(reply: dict, page_count: int) -> list[int]:
-    """The page numbers an /ask reply retrieved, best first. Stops the run unless there are min(TOP_K, page_count) of them,
-    since the metrics are @3."""
+    """The page numbers an /ask reply retrieved, best first, or none for a rejected question. Stops the run unless an
+    answered reply has min(TOP_K, page_count) of them, since the metrics are @3."""
+    if reply["decision"] != "answer":
+        return []
     pages = [page["page"] for page in reply["pages"]]
     if len(pages) != min(TOP_K, page_count):
         sys.exit(f"FAIL: /ask returned {len(pages)} of {page_count} pages; run the server with TOP_K={TOP_K}")
@@ -99,12 +102,16 @@ if __name__ == "__main__":
             upload = uploads[pair["pdf"]]
             reply = _post(client, "/ask", json={"doc_id": upload["doc_id"], "question": pair["question"]})
             rank = rank_of(retrieved_pages(reply, upload["pages"]), pair["page"])
-            results.append({**pair, "rank": rank, "statuses": [citation["status"] for citation in reply["citations"]]})
+            statuses = [citation["status"] for citation in reply["citations"]]
+            results.append({**pair, "rank": rank, "decision": reply["decision"], "statuses": statuses})
 
     print("| PDF | Question | Labeled page | Rank | Statuses |")
     print("|---|---|---|---|---|")
     for result in results:
-        rank = "missed" if result["rank"] is None else result["rank"]
+        if result["decision"] != "answer":
+            rank = f"rejected ({result['decision']})"
+        else:
+            rank = "missed" if result["rank"] is None else result["rank"]
         statuses = ", ".join(result["statuses"]) or "none"
         question = result["question"].replace("|", "\\|")  # a bare | would start a new cell
         print(f"| {Path(result['pdf']).name} | {question} | {result['page']} | {rank} | {statuses} |")
