@@ -25,12 +25,6 @@ def _page(doc: pymupdf.Document, page_number: int) -> pymupdf.Page:
     return doc[page_number - 1]
 
 
-def has_text_layer(pdf_bytes: bytes, page_number: int) -> bool:
-    """True when the page (1-based) yields any non-whitespace text; false for a scan or an image-only page."""
-    with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
-        return bool(_page(doc, page_number).get_text().strip())
-
-
 def render_page(pdf_bytes: bytes, page_number: int, dpi: int) -> tuple[bytes, int, int]:
     """Render one page (1-based) to PNG; returns the PNG bytes, width and height in pixels."""
     with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:

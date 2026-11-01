@@ -52,7 +52,6 @@ def upload(file: UploadFile) -> dict:
             "page": page,
             "width": width,
             "height": height,
-            "has_text": pdf.has_text_layer(data, page),
             "embedding": gemini.embed_image(png),
         })
     store.save_file(f"{doc_id}/source.pdf", data)

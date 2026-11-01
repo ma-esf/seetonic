@@ -48,7 +48,7 @@ grant gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" --member "ser
 bq --project_id "$PROJECT" --location "$DATA_LOCATION" query --nouse_legacy_sql "
 CREATE SCHEMA IF NOT EXISTS \`$PROJECT.$DATASET\` OPTIONS (location = '$DATA_LOCATION');
 CREATE TABLE IF NOT EXISTS \`$PROJECT.$DATASET.pages\` (
-  doc_id STRING, page INT64, width INT64, height INT64, has_text BOOL, embedding ARRAY<FLOAT64>
+  doc_id STRING, page INT64, width INT64, height INT64, embedding ARRAY<FLOAT64>
 );
 CREATE TABLE IF NOT EXISTS \`$PROJECT.$DATASET.$QUESTIONS_TABLE\` (
   ts TIMESTAMP, doc_id STRING, question STRING, pages ARRAY<STRUCT<page INT64, score FLOAT64>>,
