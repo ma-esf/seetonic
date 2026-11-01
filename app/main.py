@@ -57,17 +57,21 @@ def upload(file: UploadFile) -> dict:
 
 @app.post("/ask")
 def ask(body: Question) -> dict:
-    """Give a fixed reply to a question route_question does not label "answer", else answer from the document's top
-    pages. Jev labels every question too, but its label is only logged. Code, not the model, decides each citation's
-    status and boxes."""
+    """Give a fixed reply to a question Jev does not label "answer", or Flash blocks or labels "attack", else answer
+    from the document's top pages. Flash's label is logged and returned either way. Code, not the model, decides each
+    citation's status and boxes."""
     start = time.perf_counter()
     try:
-        route = gemini.route_question(body.question)
-        # Before the early return, so the log holds Jev's label for the questions Flash rejects too.
         jev_label = jev.label_question(body.question)
-        if route != "answer":
-            log_question(body, start, route, jev_label, [], [])
-            return {"answer": REJECTIONS[route], "pages": [], "citations": []}
+        # On every question, since Flash's label can override Jev's.
+        flash_label = gemini.route_question(body.question)
+        # A question the safety filter blocked, or either model calls an attack, must not reach the answer model.
+        decision = flash_label if flash_label in ("blocked", "attack") else jev_label[0]
+        # The last three are the log's column names; decision is not logged, as it follows from route and jev_route.
+        labels = {"decision": decision, "route": flash_label, "jev_route": jev_label[0], "jev_confidence": jev_label[1]}
+        if decision != "answer":
+            log_question(body, start, flash_label, jev_label, [], [])
+            return {"answer": REJECTIONS[decision], "pages": [], "citations": [], **labels}
         vector = gemini.embed_text(body.question)
     except (APIError, ValidationError, httpx.HTTPError):
         raise HTTPException(502, "The model is unavailable. Ask again.")
@@ -95,8 +99,8 @@ def ask(body: Question) -> dict:
                 result["snippet_url"] = f"/files/{path}"
             citations.append(result)
     pages = [{"page": page, "score": score} for page, score in scored]
-    log_question(body, start, route, jev_label, pages, [citation["status"] for citation in citations])
-    return {"answer": reply.answer, "pages": pages, "citations": citations}
+    log_question(body, start, flash_label, jev_label, pages, [citation["status"] for citation in citations])
+    return {"answer": reply.answer, "pages": pages, "citations": citations, **labels}
 
 
 def log_question(

@@ -59,9 +59,9 @@ def test_ask_answers_a_rejected_question_without_searching_or_calling_the_answer
     def never(*args):
         raise AssertionError("the pipeline ran for a rejected question")
 
-    monkeypatch.setattr(gemini, "route_question", lambda question: "off_topic")
-    # Jev disagrees, so the fixed off-topic reply shows that Flash, not Jev, chose it.
-    monkeypatch.setattr(jev, "label_question", lambda question: ("clarify", 0.6))
+    monkeypatch.setattr(jev, "label_question", lambda question: ("off_topic", 0.6))
+    # Flash disagrees, so the fixed off-topic reply shows that Jev, not Flash, chose it.
+    monkeypatch.setattr(gemini, "route_question", lambda question: "answer")
     for name in ("embed_text", "ask_model"):
         monkeypatch.setattr(gemini, name, never)
     monkeypatch.setattr(store, "search_pages", never)
@@ -71,13 +71,36 @@ def test_ask_answers_a_rejected_question_without_searching_or_calling_the_answer
         "answer": "This question is not about the document. Ask about its content.",
         "pages": [],
         "citations": [],
+        "decision": "off_topic",
+        "route": "answer",
+        "jev_route": "off_topic",
+        "jev_confidence": 0.6,
     }
     [row] = logged
-    assert row["route"] == "off_topic"
-    assert row["jev_route"] == "clarify"
+    assert row["route"] == "answer"
+    assert row["jev_route"] == "off_topic"
     assert row["jev_confidence"] == 0.6
     assert row["pages"] == []
     assert row["statuses"] == []
+
+
+def test_ask_answers_a_question_jev_labels_answer_even_when_flash_rejects_it(logged, monkeypatch):
+    monkeypatch.setattr(gemini, "route_question", lambda question: "off_topic")
+    reply = TestClient(app).post("/ask", json={"doc_id": "d1", "question": "What is gross margin?"}).json()
+    assert reply["answer"] == "4 812 euros."
+    assert reply["decision"] == "answer"
+    [row] = logged
+    assert row["route"] == "off_topic"
+
+
+@pytest.mark.parametrize("flash_label", ["blocked", "attack"])
+def test_ask_refuses_a_question_flash_blocks_or_labels_an_attack_even_when_jev_labels_it_answer(
+    logged, monkeypatch, flash_label
+):
+    monkeypatch.setattr(gemini, "route_question", lambda question: flash_label)
+    reply = TestClient(app).post("/ask", json={"doc_id": "d1", "question": "What is the invoice total?"}).json()
+    assert reply["answer"] == "This question cannot be answered."
+    assert reply["decision"] == flash_label
 
 
 def test_ask_returns_502_and_logs_nothing_when_jev_fails(logged, monkeypatch):
