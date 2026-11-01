@@ -331,12 +331,15 @@ $("#ask-form").onsubmit = async e => {
 
 function showAnswer(reply) {
   state.citations = reply.citations;
-  // The model marks bold with ** as Markdown does.
+  // The model writes Markdown, but the page shows only bold: a heading becomes a bold line, a * or - item a bullet.
+  const text = reply.answer
+    .replace(/^#+ +(.*)$/gm, (_, heading) => `**${heading.replaceAll("**", "")}**`)
+    .replace(/^( *)[*-] +/gm, "$1• ");
   const answer = $("#answer");
-  const parts = reply.answer.split("**");
+  const parts = text.split("**");
   if (parts.length % 2 === 0) {
     // An odd number of ** leaves one without a partner, which would swap bold and plain: show the answer as it came.
-    answer.textContent = reply.answer;
+    answer.textContent = text;
   } else {
     // The part between each pair of ** goes in a <strong>. Every part goes in as text.
     answer.replaceChildren();
@@ -347,8 +350,8 @@ function showAnswer(reply) {
     const card = el("div", citation.status === "unverified" ? "flag red" : "flag");
     card.append(
       el("span", "pill " + PILL[citation.status], citation.status),
-      el("div", "nm", `Page ${citation.page}`),
-      el("div", "m", `“${citation.quote}”`),
+      el("div", "nm", citation.label),
+      el("div", "m", `Page ${citation.page} · “${citation.quote}”`),
     );
     if (citation.snippet_url) {
       const snippet = el("img", "snippet");

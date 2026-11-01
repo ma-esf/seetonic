@@ -14,7 +14,10 @@ import pymupdf
 SENTENCE = "The invoice total is 4 812 euros."
 QUESTION = "What is the invoice total?"
 # The types each citation field may hold. type() is compared, not isinstance(), because True is an int.
-FIELDS = {"page": (int,), "quote": (str,), "status": (str,), "boxes": (list,), "snippet_url": (str, type(None))}
+FIELDS = {
+    "page": (int,), "quote": (str,), "label": (str,), "status": (str,), "boxes": (list,),
+    "snippet_url": (str, type(None)),
+}
 STATUSES = {"verified", "approximate", "unverified"}
 
 

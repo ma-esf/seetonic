@@ -13,7 +13,8 @@ def logged(monkeypatch) -> list[dict]:
     """Stand in for every model and storage call /ask makes; returns the rows passed to store.log_question."""
     source = one_page_pdf()
     png = pdf.render_page(source, 1, config.DPI)
-    answer = ModelAnswer(answer="4 812 euros.", citations=[Citation(page=1, quote=SENTENCE, box_2d=[0, 0, 0, 0])])
+    citation = Citation(page=1, quote=SENTENCE, label="Invoice total", box_2d=[0, 0, 0, 0])
+    answer = ModelAnswer(answer="4 812 euros.", citations=[citation])
     rows = []
     monkeypatch.setattr(gemini, "route_question", lambda question: "answer")
     monkeypatch.setattr(jev, "label_question", lambda question: ("answer", 0.97))

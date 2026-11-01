@@ -27,7 +27,10 @@ def verify_citation(page: pymupdf.Page | None, citation: Citation, dpi: int) -> 
 
     page is the cited page, or None when it was not among the retrieved pages.
     """
-    result = {"page": citation.page, "quote": citation.quote, "status": "unverified", "boxes": []}
+    # The label is the model's words and is passed on unchecked; only the quote is checked.
+    result = {
+        "page": citation.page, "quote": citation.quote, "label": citation.label, "status": "unverified", "boxes": []
+    }
     if page is None:
         return result
     scale = dpi / 72  # PyMuPDF positions are in points, 72 to the inch
