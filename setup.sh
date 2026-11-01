@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Enable the deploy APIs, create the Cloud Run service account and grant it its roles, and create the bucket,
-# the BigQuery dataset and its two tables.
+# Enable the deploy APIs, create the Cloud Run service account and grant it its roles and access to the
+# typesafe-api-key secret, and create the bucket, the BigQuery dataset and its two tables. Create that secret by hand
+# first.
 # Safe to rerun: each step leaves an existing one as it is.
 # Reads the same environment variables as app/config.py, with the same defaults.
 set -euo pipefail
@@ -23,7 +24,7 @@ grant() {
 
 # Without these, gcloud run deploy stops to ask whether to enable them, and creating the service account fails.
 gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com iam.googleapis.com \
-  --project "$PROJECT"
+  secretmanager.googleapis.com --project "$PROJECT"
 
 if ! gcloud iam service-accounts describe "$SERVICE_ACCOUNT" --project "$PROJECT" >/dev/null 2>&1; then
   gcloud iam service-accounts create seetonic-run --project "$PROJECT" --display-name "Seetonic on Cloud Run"
@@ -34,6 +35,9 @@ for role in roles/aiplatform.user roles/bigquery.jobUser; do
   grant gcloud projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$SERVICE_ACCOUNT" --role "$role" \
     --condition None --format none
 done
+# Created by hand, not here, so the key never lands in a file.
+grant gcloud secrets add-iam-policy-binding typesafe-api-key --project "$PROJECT" \
+  --member "serviceAccount:$SERVICE_ACCOUNT" --role roles/secretmanager.secretAccessor --format none
 
 if ! gcloud storage buckets describe "gs://$BUCKET" --project "$PROJECT" >/dev/null 2>&1; then
   gcloud storage buckets create "gs://$BUCKET" --project "$PROJECT" --location "$DATA_LOCATION"
@@ -48,9 +52,11 @@ CREATE TABLE IF NOT EXISTS \`$PROJECT.$DATASET.pages\` (
 );
 CREATE TABLE IF NOT EXISTS \`$PROJECT.$DATASET.$QUESTIONS_TABLE\` (
   ts TIMESTAMP, doc_id STRING, question STRING, pages ARRAY<STRUCT<page INT64, score FLOAT64>>,
-  statuses ARRAY<STRING>, latency_ms INT64, embed_model STRING, answer_model STRING, route STRING
+  statuses ARRAY<STRING>, latency_ms INT64, embed_model STRING, answer_model STRING, route STRING,
+  jev_route STRING, jev_confidence FLOAT64
 );
--- CREATE TABLE IF NOT EXISTS leaves a table made before the route column without it.
-ALTER TABLE \`$PROJECT.$DATASET.$QUESTIONS_TABLE\` ADD COLUMN IF NOT EXISTS route STRING;"
+-- CREATE TABLE IF NOT EXISTS leaves a table made before a column without it.
+ALTER TABLE \`$PROJECT.$DATASET.$QUESTIONS_TABLE\` ADD COLUMN IF NOT EXISTS route STRING,
+  ADD COLUMN IF NOT EXISTS jev_route STRING, ADD COLUMN IF NOT EXISTS jev_confidence FLOAT64;"
 grant bq --project_id "$PROJECT" --location "$DATA_LOCATION" query --nouse_legacy_sql \
   "GRANT \`roles/bigquery.dataEditor\` ON SCHEMA \`$PROJECT.$DATASET\` TO 'serviceAccount:$SERVICE_ACCOUNT'"

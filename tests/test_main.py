@@ -1,8 +1,9 @@
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from google.genai.errors import APIError
 
-from app import config, gemini, pdf, store
+from app import config, gemini, jev, pdf, store
 from app.gemini import Citation, ModelAnswer, Route
 from app.main import app
 from scripts.smoke import SENTENCE, one_page_pdf
@@ -16,6 +17,7 @@ def logged(monkeypatch) -> list[dict]:
     answer = ModelAnswer(answer="4 812 euros.", citations=[Citation(page=1, quote=SENTENCE, box_2d=[0, 0, 0, 0])])
     rows = []
     monkeypatch.setattr(gemini, "route_question", lambda question: "answer")
+    monkeypatch.setattr(jev, "label_question", lambda question: ("answer", 0.97))
     monkeypatch.setattr(gemini, "embed_text", lambda text: [0.0])
     monkeypatch.setattr(gemini, "ask_model", lambda question, pages: answer)
     monkeypatch.setattr(store, "search_pages", lambda doc_id, vector, k: [(1, 0.52)])
@@ -37,6 +39,8 @@ def test_ask_logs_one_row_with_the_pages_and_statuses_it_returns(logged):
     assert row["embed_model"] == config.EMBEDDING_MODEL
     assert row["answer_model"] == config.FLASH_MODEL
     assert row["route"] == "answer"
+    assert row["jev_route"] == "answer"
+    assert row["jev_confidence"] == 0.97
     assert row["ts"]
 
 
@@ -63,6 +67,8 @@ def test_ask_answers_a_rejected_question_without_searching_or_calling_the_answer
         raise AssertionError("the pipeline ran for a rejected question")
 
     monkeypatch.setattr(gemini, "route_question", lambda question: "off_topic")
+    # Jev disagrees, so the fixed off-topic reply shows that Flash, not Jev, chose it.
+    monkeypatch.setattr(jev, "label_question", lambda question: ("clarify", 0.6))
     for name in ("embed_text", "ask_model"):
         monkeypatch.setattr(gemini, name, never)
     monkeypatch.setattr(store, "search_pages", never)
@@ -75,6 +81,8 @@ def test_ask_answers_a_rejected_question_without_searching_or_calling_the_answer
     }
     [row] = logged
     assert row["route"] == "off_topic"
+    assert row["jev_route"] == "clarify"
+    assert row["jev_confidence"] == 0.6
     assert row["pages"] == []
     assert row["statuses"] == []
 
@@ -90,6 +98,23 @@ def unreadable(question):
 @pytest.mark.parametrize("route_question", [unavailable, unreadable])
 def test_ask_returns_502_and_logs_nothing_when_the_router_fails(logged, monkeypatch, route_question):
     monkeypatch.setattr(gemini, "route_question", route_question)
+    response = TestClient(app).post("/ask", json={"doc_id": "d1", "question": "What is the invoice total?"})
+    assert response.status_code == 502
+    assert response.json() == {"detail": "The model is unavailable. Ask again."}
+    assert logged == []
+
+
+def timed_out(question):
+    raise httpx.ConnectTimeout("timed out")
+
+
+def unfitting(question):
+    return jev.Reply.model_validate_json('{"answers": {"route": {"choice": "poem", "confidence": 0.5}}}')
+
+
+@pytest.mark.parametrize("label_question", [timed_out, unfitting])
+def test_ask_returns_502_and_logs_nothing_when_jev_fails(logged, monkeypatch, label_question):
+    monkeypatch.setattr(jev, "label_question", label_question)
     response = TestClient(app).post("/ask", json={"doc_id": "d1", "question": "What is the invoice total?"})
     assert response.status_code == 502
     assert response.json() == {"detail": "The model is unavailable. Ask again."}

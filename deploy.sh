@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Build the image from this folder in Cloud Build, deploy it to Cloud Run and print the service URL.
 # Run setup.sh first. Safe to rerun: each run deploys a new revision of the same service.
-# Passes every setting in app/config.py as an environment variable, with the same defaults.
+# Passes every setting in app/config.py as an environment variable, with the same defaults; TYPESAFE_API_KEY comes
+# from Secret Manager.
 set -euo pipefail
 cd "$(dirname "$0")"  # --source . must be this folder, wherever the script is run from
 
@@ -10,6 +11,7 @@ REGION="${REGION:-europe-north1}"
 LOCATION="${GOOGLE_CLOUD_LOCATION:-eu}"
 EMBEDDING_MODEL="${EMBEDDING_MODEL:-gemini-embedding-2}"
 FLASH_MODEL="${FLASH_MODEL:-gemini-3.8-flash}"
+JEV_MODEL="${JEV_MODEL:-jev-1.13.0}"
 DPI="${DPI:-144}"
 TOP_K="${TOP_K:-3}"
 EMBEDDING_SIZE="${EMBEDDING_SIZE:-768}"
@@ -27,7 +29,9 @@ gcloud run deploy seetonic --source . --quiet \
   --service-account "seetonic-run@$PROJECT.iam.gserviceaccount.com" \
   --min-instances 0 --max-instances 2 --concurrency 1 \
   --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT,GOOGLE_CLOUD_LOCATION=$LOCATION,\
-EMBEDDING_MODEL=$EMBEDDING_MODEL,FLASH_MODEL=$FLASH_MODEL,DPI=$DPI,TOP_K=$TOP_K,EMBEDDING_SIZE=$EMBEDDING_SIZE,\
-DATA_LOCATION=$DATA_LOCATION,BUCKET=$BUCKET,DATASET=$DATASET,QUESTIONS_TABLE=$QUESTIONS_TABLE,MAX_PAGES=$MAX_PAGES"
+EMBEDDING_MODEL=$EMBEDDING_MODEL,FLASH_MODEL=$FLASH_MODEL,JEV_MODEL=$JEV_MODEL,DPI=$DPI,TOP_K=$TOP_K,\
+EMBEDDING_SIZE=$EMBEDDING_SIZE,DATA_LOCATION=$DATA_LOCATION,BUCKET=$BUCKET,DATASET=$DATASET,\
+QUESTIONS_TABLE=$QUESTIONS_TABLE,MAX_PAGES=$MAX_PAGES" \
+  --set-secrets "TYPESAFE_API_KEY=typesafe-api-key:latest"
 
 gcloud run services describe seetonic --project "$PROJECT" --region "$REGION" --format 'value(status.url)'

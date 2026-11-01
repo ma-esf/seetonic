@@ -11,10 +11,11 @@ dependencies = [
     "python-multipart",
     "google-cloud-storage",
     "google-cloud-bigquery",
+    "httpx",
 ]
 
 [dependency-groups]
-dev = ["httpx", "pytest"]
+dev = ["pytest"]
 
 [build-system]
 requires = ["hatchling"]
