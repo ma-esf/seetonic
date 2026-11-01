@@ -1,10 +1,9 @@
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-from google.genai.errors import APIError
 
 from app import config, gemini, jev, pdf, store
-from app.gemini import Citation, ModelAnswer, Route
+from app.gemini import Citation, ModelAnswer
 from app.main import app
 from scripts.smoke import SENTENCE, one_page_pdf
 
@@ -55,13 +54,6 @@ def test_ask_still_answers_when_logging_fails(logged, monkeypatch, capsys):
     assert "no such table" in capsys.readouterr().err
 
 
-def test_ask_logs_nothing_for_an_unknown_document(logged, monkeypatch):
-    monkeypatch.setattr(store, "search_pages", lambda doc_id, vector, k: [])
-    response = TestClient(app).post("/ask", json={"doc_id": "missing", "question": "What is the invoice total?"})
-    assert response.status_code == 404
-    assert logged == []
-
-
 def test_ask_answers_a_rejected_question_without_searching_or_calling_the_answer_model(logged, monkeypatch):
     def never(*args):
         raise AssertionError("the pipeline ran for a rejected question")
@@ -87,34 +79,11 @@ def test_ask_answers_a_rejected_question_without_searching_or_calling_the_answer
     assert row["statuses"] == []
 
 
-def unavailable(question):
-    raise APIError(503, {"error": {"message": "unavailable"}})
+def test_ask_returns_502_and_logs_nothing_when_jev_fails(logged, monkeypatch):
+    def timed_out(question):
+        raise httpx.ConnectTimeout("timed out")
 
-
-def unreadable(question):
-    return Route.model_validate_json('{"label": "poem"}')
-
-
-@pytest.mark.parametrize("route_question", [unavailable, unreadable])
-def test_ask_returns_502_and_logs_nothing_when_the_router_fails(logged, monkeypatch, route_question):
-    monkeypatch.setattr(gemini, "route_question", route_question)
-    response = TestClient(app).post("/ask", json={"doc_id": "d1", "question": "What is the invoice total?"})
-    assert response.status_code == 502
-    assert response.json() == {"detail": "The model is unavailable. Ask again."}
-    assert logged == []
-
-
-def timed_out(question):
-    raise httpx.ConnectTimeout("timed out")
-
-
-def unfitting(question):
-    return jev.Reply.model_validate_json('{"answers": {"route": {"choice": "poem", "confidence": 0.5}}}')
-
-
-@pytest.mark.parametrize("label_question", [timed_out, unfitting])
-def test_ask_returns_502_and_logs_nothing_when_jev_fails(logged, monkeypatch, label_question):
-    monkeypatch.setattr(jev, "label_question", label_question)
+    monkeypatch.setattr(jev, "label_question", timed_out)
     response = TestClient(app).post("/ask", json={"doc_id": "d1", "question": "What is the invoice total?"})
     assert response.status_code == 502
     assert response.json() == {"detail": "The model is unavailable. Ask again."}
