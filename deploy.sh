@@ -7,7 +7,7 @@ cd "$(dirname "$0")"  # --source . must be this folder, wherever the script is r
 
 PROJECT="${GOOGLE_CLOUD_PROJECT:-seetonic-demo}"
 REGION="${REGION:-europe-north1}"
-LOCATION="${GOOGLE_CLOUD_LOCATION:-global}"
+LOCATION="${GOOGLE_CLOUD_LOCATION:-eu}"
 EMBEDDING_MODEL="${EMBEDDING_MODEL:-gemini-embedding-2}"
 FLASH_MODEL="${FLASH_MODEL:-gemini-3.8-flash}"
 DPI="${DPI:-144}"
