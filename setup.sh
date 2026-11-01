@@ -48,7 +48,9 @@ CREATE TABLE IF NOT EXISTS \`$PROJECT.$DATASET.pages\` (
 );
 CREATE TABLE IF NOT EXISTS \`$PROJECT.$DATASET.$QUESTIONS_TABLE\` (
   ts TIMESTAMP, doc_id STRING, question STRING, pages ARRAY<STRUCT<page INT64, score FLOAT64>>,
-  statuses ARRAY<STRING>, latency_ms INT64, embed_model STRING, answer_model STRING
-);"
+  statuses ARRAY<STRING>, latency_ms INT64, embed_model STRING, answer_model STRING, route STRING
+);
+-- CREATE TABLE IF NOT EXISTS leaves a table made before the route column without it.
+ALTER TABLE \`$PROJECT.$DATASET.$QUESTIONS_TABLE\` ADD COLUMN IF NOT EXISTS route STRING;"
 grant bq --project_id "$PROJECT" --location "$DATA_LOCATION" query --nouse_legacy_sql \
   "GRANT \`roles/bigquery.dataEditor\` ON SCHEMA \`$PROJECT.$DATASET\` TO 'serviceAccount:$SERVICE_ACCOUNT'"

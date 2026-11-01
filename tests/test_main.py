@@ -1,8 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
+from google.genai.errors import APIError
 
 from app import config, gemini, pdf, store
-from app.gemini import Citation, ModelAnswer
+from app.gemini import Citation, ModelAnswer, Route
 from app.main import app
 from scripts.smoke import SENTENCE, one_page_pdf
 
@@ -14,6 +15,7 @@ def logged(monkeypatch) -> list[dict]:
     png = pdf.render_page(source, 1, config.DPI)[0]
     answer = ModelAnswer(answer="4 812 euros.", citations=[Citation(page=1, quote=SENTENCE, box_2d=[0, 0, 0, 0])])
     rows = []
+    monkeypatch.setattr(gemini, "route_question", lambda question: "answer")
     monkeypatch.setattr(gemini, "embed_text", lambda text: [0.0])
     monkeypatch.setattr(gemini, "ask_model", lambda question, pages: answer)
     monkeypatch.setattr(store, "search_pages", lambda doc_id, vector, k: [(1, 0.52)])
@@ -34,6 +36,7 @@ def test_ask_logs_one_row_with_the_pages_and_statuses_it_returns(logged):
     assert isinstance(row["latency_ms"], int) and row["latency_ms"] >= 0
     assert row["embed_model"] == config.EMBEDDING_MODEL
     assert row["answer_model"] == config.FLASH_MODEL
+    assert row["route"] == "answer"
     assert row["ts"]
 
 
@@ -52,4 +55,42 @@ def test_ask_logs_nothing_for_an_unknown_document(logged, monkeypatch):
     monkeypatch.setattr(store, "search_pages", lambda doc_id, vector, k: [])
     response = TestClient(app).post("/ask", json={"doc_id": "missing", "question": "What is the invoice total?"})
     assert response.status_code == 404
+    assert logged == []
+
+
+def test_ask_answers_a_rejected_question_without_searching_or_calling_the_answer_model(logged, monkeypatch):
+    def never(*args):
+        raise AssertionError("the pipeline ran for a rejected question")
+
+    monkeypatch.setattr(gemini, "route_question", lambda question: "off_topic")
+    for name in ("embed_text", "ask_model"):
+        monkeypatch.setattr(gemini, name, never)
+    monkeypatch.setattr(store, "search_pages", never)
+    response = TestClient(app).post("/ask", json={"doc_id": "d1", "question": "Write me a poem about the sea."})
+    assert response.status_code == 200
+    assert response.json() == {
+        "answer": "This question is not about the document. Ask about its content.",
+        "pages": [],
+        "citations": [],
+    }
+    [row] = logged
+    assert row["route"] == "off_topic"
+    assert row["pages"] == []
+    assert row["statuses"] == []
+
+
+def unavailable(question):
+    raise APIError(503, {"error": {"message": "unavailable"}})
+
+
+def unreadable(question):
+    return Route.model_validate_json('{"label": "poem"}')
+
+
+@pytest.mark.parametrize("route_question", [unavailable, unreadable])
+def test_ask_returns_502_and_logs_nothing_when_the_router_fails(logged, monkeypatch, route_question):
+    monkeypatch.setattr(gemini, "route_question", route_question)
+    response = TestClient(app).post("/ask", json={"doc_id": "d1", "question": "What is the invoice total?"})
+    assert response.status_code == 502
+    assert response.json() == {"detail": "The model is unavailable. Ask again."}
     assert logged == []
