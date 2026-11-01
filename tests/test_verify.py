@@ -31,7 +31,7 @@ def _line_boxes(page: pymupdf.Page) -> list[list[float]]:
 
 
 def _citation(page: int, quote: str, box_2d: list[int] = [0, 0, 0, 0]) -> Citation:
-    return Citation(page=page, quote=quote, box_2d=box_2d)
+    return Citation(page=page, quote=quote, label="", box_2d=box_2d)
 
 
 def test_an_exact_quote_is_verified_with_its_box_in_pixels():
@@ -163,4 +163,4 @@ def test_a_model_box_with_no_area_on_the_page_image_is_unverified_with_no_boxes(
 
 def test_a_citation_to_a_page_that_was_not_retrieved_is_unverified_with_no_boxes():
     result = verify_citation(None, _citation(11, "Net revenue was 2312"), DPI)
-    assert result == {"page": 11, "quote": "Net revenue was 2312", "status": "unverified", "boxes": []}
+    assert result == {"page": 11, "quote": "Net revenue was 2312", "label": "", "status": "unverified", "boxes": []}

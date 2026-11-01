@@ -13,7 +13,11 @@ client = genai.Client(vertexai=True, project=config.PROJECT, location=config.LOC
 INSTRUCTION = (
     'Answer the question using only the page images. Each image follows a label "Page N"; '
     "cite that N as the page. For each claim, copy the exact words from the page as the quote, "
-    "and give box_2d around the quote as [ymin, xmin, ymax, xmax] on a 0-1000 scale."
+    "as one continuous run of text in the order the page reads, with nothing left out; from a table, quote one cell "
+    "per citation, never text joined from several cells, and prefer the numbers a claim rests on, without the $. "
+    "Every claim in the answer, each list item included, needs its own citation. Give each citation a short label "
+    'that says what the quote is, such as "Net revenue, year ended December 31, 2024". Give box_2d around the quote '
+    "as [ymin, xmin, ymax, xmax] on a 0-1000 scale."
 )
 
 ROUTER_INSTRUCTION = (
@@ -32,6 +36,7 @@ class Route(BaseModel):
 class Citation(BaseModel):
     page: int
     quote: str
+    label: str
     box_2d: list[int] = Field(min_length=4, max_length=4)
 
 
