@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+import httpx
 import pymupdf
 from fastapi import FastAPI, HTTPException, Response, UploadFile
 from fastapi.staticfiles import StaticFiles
@@ -11,7 +12,7 @@ from google.api_core.exceptions import NotFound
 from google.genai.errors import APIError
 from pydantic import BaseModel, Field, ValidationError
 
-from app import config, gemini, pdf, store, verify
+from app import config, gemini, jev, pdf, store, verify
 
 app = FastAPI()
 
@@ -64,15 +65,18 @@ def upload(file: UploadFile) -> dict:
 @app.post("/ask")
 def ask(body: Question) -> dict:
     """Give a fixed reply to a question route_question does not label "answer", else answer from the document's top
-    pages. Code, not the model, decides each citation's status and boxes."""
+    pages. Jev labels every question too, but its label is only logged. Code, not the model, decides each citation's
+    status and boxes."""
     start = time.perf_counter()
     try:
         route = gemini.route_question(body.question)
+        # Before the early return, so the log holds Jev's label for the questions Flash rejects too.
+        jev_label = jev.label_question(body.question)
         if route != "answer":
-            log_question(body, start, route, [], [])
+            log_question(body, start, route, jev_label, [], [])
             return {"answer": REJECTIONS[route], "pages": [], "citations": []}
         vector = gemini.embed_text(body.question)
-    except (APIError, ValidationError):
+    except (APIError, ValidationError, httpx.HTTPError):
         raise HTTPException(502, "The model is unavailable. Ask again.")
     scored = store.search_pages(body.doc_id, vector, config.TOP_K)
     if not scored:
@@ -98,11 +102,13 @@ def ask(body: Question) -> dict:
                 result["snippet_url"] = f"/files/{path}"
             citations.append(result)
     pages = [{"page": page, "score": score} for page, score in scored]
-    log_question(body, start, route, pages, [citation["status"] for citation in citations])
+    log_question(body, start, route, jev_label, pages, [citation["status"] for citation in citations])
     return {"answer": reply.answer, "pages": pages, "citations": citations}
 
 
-def log_question(body: Question, start: float, route: str, pages: list[dict], statuses: list[str]) -> None:
+def log_question(
+    body: Question, start: float, route: str, jev_label: tuple[str, float], pages: list[dict], statuses: list[str]
+) -> None:
     try:
         store.log_question({
             "ts": datetime.now(timezone.utc).isoformat(),
@@ -114,6 +120,8 @@ def log_question(body: Question, start: float, route: str, pages: list[dict], st
             "embed_model": config.EMBEDDING_MODEL,
             "answer_model": config.FLASH_MODEL,
             "route": route,
+            "jev_route": jev_label[0],
+            "jev_confidence": jev_label[1],
         })
     except Exception as error:
         # Monitoring must never cost the user the answer, but the failure must show in the logs.

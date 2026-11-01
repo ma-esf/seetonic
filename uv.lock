@@ -1166,6 +1166,7 @@ dependencies = [
     { name = "google-cloud-bigquery" },
     { name = "google-cloud-storage" },
     { name = "google-genai" },
+    { name = "httpx" },
     { name = "pymupdf" },
     { name = "python-multipart" },
     { name = "uvicorn" },
@@ -1173,7 +1174,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pytest" },
 ]
 
@@ -1183,16 +1183,14 @@ requires-dist = [
     { name = "google-cloud-bigquery" },
     { name = "google-cloud-storage" },
     { name = "google-genai", specifier = ">=2.33" },
+    { name = "httpx" },
     { name = "pymupdf" },
     { name = "python-multipart" },
     { name = "uvicorn" },
 ]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "httpx" },
-    { name = "pytest" },
-]
+dev = [{ name = "pytest" }]
 
 [[package]]
 name = "six"
