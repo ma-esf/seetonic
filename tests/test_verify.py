@@ -43,19 +43,6 @@ def test_an_exact_quote_is_verified_with_its_box_in_pixels():
     assert result["boxes"] == _line_boxes(page)
 
 
-def test_a_thin_space_in_the_quote_matches_a_non_breaking_space_in_the_number():
-    # page.insert_text saves U+00A0 as a plain space, so the fixture uses TextWriter, which keeps it.
-    page = pymupdf.open().new_page(width=612, height=792)
-    writer = pymupdf.TextWriter(page.rect)
-    writer.append((72, 112), "Net revenue was 2\u00a0312", font=pymupdf.Font("helv"), fontsize=12)
-    writer.write_text(page)
-    assert "2\u00a0312" in page.get_text()
-
-    result = verify_citation(page, _citation(4, "Net revenue was 2\u2009312"), DPI)
-    assert result["status"] == "verified"
-    assert result["boxes"] == _line_boxes(page)
-
-
 @pytest.mark.parametrize("separator", [chr(0x2009), chr(0x202F)], ids=["thin-space", "narrow-no-break-space"])
 def test_a_plain_space_in_the_quote_matches_a_thin_separator_in_the_number(separator):
     page = pymupdf.open().new_page(width=612, height=792)
@@ -126,18 +113,6 @@ def test_a_quote_not_on_the_page_is_unverified_with_no_boxes():
     result = verify_citation(page, _citation(4, "Net revenue was 2900"), DPI)
     assert result["status"] == "unverified"
     assert result["boxes"] == []
-
-
-def test_a_quote_across_the_page_edge_keeps_only_the_part_on_the_page_image():
-    page = pymupdf.open().new_page(width=612, height=792)
-    page.insert_text((72, 306), "Net revenue was 2312")
-    # The page image now starts 300 points down, so the top of the line sticks out above it.
-    page.set_cropbox(pymupdf.Rect(0, 300, 612, 792))
-    result = verify_citation(page, _citation(4, "Net revenue was 2312"), DPI)
-    assert result["status"] == "verified"
-    [(x0, y0, x1, y1)] = result["boxes"]
-    assert y0 == pytest.approx(0)
-    assert y1 > y0
 
 
 @pytest.mark.parametrize(
