@@ -12,7 +12,7 @@ from scripts.smoke import SENTENCE, one_page_pdf
 def logged(monkeypatch) -> list[dict]:
     """Stand in for every model and storage call /ask makes; returns the rows passed to store.log_question."""
     source = one_page_pdf()
-    png = pdf.render_page(source, 1, config.DPI)[0]
+    png = pdf.render_page(source, 1, config.DPI)
     answer = ModelAnswer(answer="4 812 euros.", citations=[Citation(page=1, quote=SENTENCE, box_2d=[0, 0, 0, 0])])
     rows = []
     monkeypatch.setattr(gemini, "route_question", lambda question: "answer")

@@ -45,16 +45,9 @@ def upload(file: UploadFile) -> dict:
     # Render and embed every page before the first write, so a failed model call leaves nothing behind.
     pngs, rows = [], []
     for page in range(1, pages + 1):
-        png, width, height = pdf.render_page(data, page, config.DPI)
+        png = pdf.render_page(data, page, config.DPI)
         pngs.append(png)
-        rows.append({
-            "doc_id": doc_id,
-            "page": page,
-            "width": width,
-            "height": height,
-            "has_text": pdf.has_text_layer(data, page),
-            "embedding": gemini.embed_image(png),
-        })
+        rows.append({"doc_id": doc_id, "page": page, "embedding": gemini.embed_image(png)})
     store.save_file(f"{doc_id}/source.pdf", data)
     for page, png in enumerate(pngs, start=1):
         store.save_file(f"{doc_id}/pages/{page}.png", png)
