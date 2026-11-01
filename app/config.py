@@ -6,13 +6,14 @@ deploy.sh and setup.sh repeat these defaults: change them there too.
 import os
 
 PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "seetonic-demo")
-LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
+# The eu endpoint keeps model calls inside the EU.
+LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "eu")
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "gemini-embedding-2")
 FLASH_MODEL = os.environ.get("FLASH_MODEL", "gemini-3.8-flash")
 DPI = int(os.environ.get("DPI", "144"))
 TOP_K = int(os.environ.get("TOP_K", "3"))
 EMBEDDING_SIZE = int(os.environ.get("EMBEDDING_SIZE", "768"))
-# Model calls use global, which a bucket or a dataset rejects as a location.
+# Flash has no single-region endpoint, so the data gets its own EU region.
 DATA_LOCATION = os.environ.get("DATA_LOCATION", "europe-north1")
 BUCKET = os.environ.get("BUCKET", f"{PROJECT}-files")
 DATASET = os.environ.get("DATASET", "seetonic")
