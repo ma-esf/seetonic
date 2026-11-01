@@ -18,17 +18,13 @@ def page_count(pdf_bytes: bytes) -> int:
         return doc.page_count
 
 
-def _page(doc: pymupdf.Document, page_number: int) -> pymupdf.Page:
-    # pymupdf counts negative indexes from the end, so page 0 would be the last page.
-    if not 1 <= page_number <= doc.page_count:
-        raise ValueError(f"page {page_number} is not in this {doc.page_count}-page PDF")
-    return doc[page_number - 1]
-
-
 def render_page(pdf_bytes: bytes, page_number: int, dpi: int) -> bytes:
     """Render one page (1-based) to PNG."""
     with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
-        return _page(doc, page_number).get_pixmap(dpi=dpi).tobytes("png")
+        # pymupdf counts negative indexes from the end, so page 0 would be the last page.
+        if not 1 <= page_number <= doc.page_count:
+            raise ValueError(f"page {page_number} is not in this {doc.page_count}-page PDF")
+        return doc[page_number - 1].get_pixmap(dpi=dpi).tobytes("png")
 
 
 def crop(png: bytes, box: list[float]) -> bytes:
