@@ -10,7 +10,7 @@ SEPARATORS = [" ", chr(0x2009), chr(0x202F)]
 
 
 def _stands_alone(quote: str, text: str) -> bool:
-    """True when the quote is in the text and does not cut a longer word or number short.
+    """True when the quote occurs at least once in the text without cutting a longer word or number short.
 
     Only an edge that is a letter or digit is checked: "2,312" may not be read from "12,312" or "2,312.5",
     but "$2,312" may follow "US" and "Introduction" may follow "1.".
@@ -34,8 +34,8 @@ def verify_citation(page: pymupdf.Page | None, citation: Citation, dpi: int) -> 
     if page is None:
         return result
     scale = dpi / 72  # PyMuPDF positions are in points, 72 to the inch
-    # TEXTFLAGS_SEARCH joins a word hyphenated at a line end and splits a ligature such as U+FB01 into its letters.
-    # The default flags keep the ligature, and get_text's also keeps the hyphen.
+    # The same flags as search_for below, so both see the same text: a word hyphenated at a line end joined, and a
+    # ligature such as U+FB01 split into its letters.
     text = page.get_text(flags=pymupdf.TEXTFLAGS_SEARCH)
     if not text.strip():
         # A scan has no text to search, so keep the model's box: [ymin, xmin, ymax, xmax] on a 0-1000 scale.
@@ -48,7 +48,8 @@ def verify_citation(page: pymupdf.Page | None, citation: Citation, dpi: int) -> 
         return {**result, "status": "approximate", "boxes": [list(box)]}
     # Every run of whitespace, Unicode spaces included, becomes one plain space, in the quote and in the page text.
     quote = " ".join(citation.quote.split())
-    # search_for also matches inside a longer word or number.
+    # search_for also matches inside a longer word or number, so check the quote stands alone at least once. The
+    # boxes still cover every match: "2,312" also highlights inside "12,312".
     if not quote or not _stands_alone(quote.lower(), " ".join(text.split()).lower()):
         return result
     for separator in SEPARATORS:

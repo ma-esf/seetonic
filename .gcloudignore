@@ -1,5 +1,5 @@
 # What `gcloud run deploy --source` uploads: only the files the image needs.
-# gcloud never reads git's info/exclude, where the tracker and the agent files are excluded, so this is an allowlist.
+# An allowlist: gcloud does not read .git/info/exclude, so files excluded only there would be uploaded.
 # A bare * matches at every depth, so a re-included folder needs its contents re-included too.
 # Check the result with: gcloud meta list-files-for-upload .
 *

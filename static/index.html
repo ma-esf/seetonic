@@ -314,7 +314,7 @@ $("#upload").onclick = async () => {
 /* ---------- 2. ask ---------- */
 const PILL = { verified: "green", approximate: "amber", unverified: "red" };
 
-// An empty question is sent too: the server rejects it, and its message shows. Trimmed, so only spaces count as empty.
+// An empty question is sent too, and the server's rejection shows. Trimmed, so a question of only spaces is empty.
 $("#ask-form").onsubmit = async e => {
   e.preventDefault();
   const button = $("#ask");

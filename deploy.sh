@@ -23,7 +23,7 @@ MAX_PAGES="${MAX_PAGES:-50}"
 
 # Who may call the service is set in IAM, not here, so a redeploy keeps it open or closed. --concurrency 1 keeps
 # PyMuPDF, which does not support threads, on one request per instance, and with --max-instances 2 it caps the
-# service at two requests at once, which bounds the model quota spent.
+# service at two requests at once, which caps the rate of model calls.
 gcloud run deploy seetonic --source . --quiet \
   --project "$PROJECT" --region "$REGION" \
   --service-account "seetonic-run@$PROJECT.iam.gserviceaccount.com" \

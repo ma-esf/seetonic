@@ -3,7 +3,7 @@
 # typesafe-api-key secret, and create the bucket, the BigQuery dataset and its two tables. Create that secret by hand
 # first.
 # Safe to rerun: each step leaves an existing one as it is.
-# Reads the same environment variables as app/config.py, with the same defaults.
+# Reads the project and storage settings of app/config.py, with the same defaults.
 set -euo pipefail
 
 PROJECT="${GOOGLE_CLOUD_PROJECT:-seetonic-demo}"
@@ -35,7 +35,7 @@ for role in roles/aiplatform.user roles/bigquery.jobUser; do
   grant gcloud projects add-iam-policy-binding "$PROJECT" --member "serviceAccount:$SERVICE_ACCOUNT" --role "$role" \
     --condition None --format none
 done
-# Created by hand, not here, so the key never lands in a file.
+# The typesafe-api-key secret is created by hand, so the key never lands in a file.
 grant gcloud secrets add-iam-policy-binding typesafe-api-key --project "$PROJECT" \
   --member "serviceAccount:$SERVICE_ACCOUNT" --role roles/secretmanager.secretAccessor --format none
 
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS \`$PROJECT.$DATASET.$QUESTIONS_TABLE\` (
   statuses ARRAY<STRING>, latency_ms INT64, embed_model STRING, answer_model STRING, route STRING,
   jev_route STRING, jev_confidence FLOAT64
 );
--- CREATE TABLE IF NOT EXISTS leaves a table made before a column without it.
+-- Adds the routing columns to a questions table created before them.
 ALTER TABLE \`$PROJECT.$DATASET.$QUESTIONS_TABLE\` ADD COLUMN IF NOT EXISTS route STRING,
   ADD COLUMN IF NOT EXISTS jev_route STRING, ADD COLUMN IF NOT EXISTS jev_confidence FLOAT64;"
 grant bq --project_id "$PROJECT" --location "$DATA_LOCATION" query --nouse_legacy_sql \

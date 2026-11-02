@@ -6,12 +6,13 @@ from pydantic import BaseModel
 from app import config
 
 # TypeSafe names no EU region, so the questions sent here may leave the EU.
-# Creating the client needs no key, so the app and the tests start without one. The timeout limits each phase.
+# The client builds without a key, so imports and tests work; /ask needs a real key, or every question returns 502.
+# timeout=2 applies to connect, read, write and pool separately, so one call can take longer than 2 s.
 client = httpx.Client(
     base_url="https://api.typesafe.ai", headers={"Authorization": f"Bearer {config.TYPESAFE_API_KEY}"}, timeout=2
 )
 
-# Copied word for word from gemini.ROUTER_INSTRUCTION, so Jev and Flash judge the same definitions.
+# gemini.ROUTER_INSTRUCTION split into Jev's instruction and criteria, so Jev and Flash judge the same definitions.
 INSTRUCTION = (
     "Label a question a user asks about an uploaded document, such as a report or a financial statement. "
     "If the question could be about the document's content, choose answer."

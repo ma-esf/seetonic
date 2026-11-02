@@ -4,7 +4,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.7 /uv /bin/uv
 WORKDIR /srv
 # Dependencies first, so a change to app/ or static/ reuses this layer.
 # --no-install-project: app/ runs from the source tree, because app/main.py finds static/ beside it.
-# --compile-bytecode: compile once here, not on the first request after every scale from zero.
+# --compile-bytecode: compile the dependencies at build time, not on every cold start.
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project --compile-bytecode
 COPY app ./app
