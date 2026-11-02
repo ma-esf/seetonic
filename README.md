@@ -29,22 +29,31 @@ Live: <https://seetonic-v77e2oesjq-lz.a.run.app>
 ## How it works
 
 ```mermaid
-flowchart LR
+flowchart TB
+    accTitle: How Seetonic answers a question about a PDF
+    accDescr: An upload stores page images in Cloud Storage and page embeddings in BigQuery. A question is routed by Jev and Flash, then answered from the top three pages, and each quote is checked against the PDF.
+
     subgraph upload["Upload"]
-        direction TB
-        pdf["PDF"] --> prepare["Validate PDF<br/>Render and embed each page"]
-        prepare --> storage["Cloud Storage: PDF and page images<br/>BigQuery: page embeddings"]
+        direction LR
+        pdf(["PDF"]) --> prepare["Validate, render<br/>and embed each page"]
     end
 
+    gcs[("Cloud Storage<br/>PDF, page images")]
+    bq[("BigQuery<br/>page embeddings")]
+    prepare --> gcs & bq
+
     subgraph ask["Question"]
-        direction TB
-        question["Question"] --> route{"Route: Jev, then Flash"}
-        route -->|"Clarify or refuse"| fixed["Fixed response"]
-        route -->|"Answer"| retrieve["Embed question<br/>Retrieve up to 3 pages from BigQuery"]
-        retrieve --> generate["Flash generates answer and citations<br/>from retrieved page images"]
-        generate --> verify["Check quotes and assign citation statuses"]
-        verify --> response["Answer and citations"]
+        direction LR
+        question(["Question"]) --> route{"Route<br/>Jev + Flash"}
+        route -->|clarify or refuse| fixed(["Fixed response"])
+        route -->|answer| retrieve["Retrieve<br/>top 3 pages"]
+        retrieve --> generate["Flash answers<br/>with citations"]
+        generate --> verify["Check quotes<br/>against the PDF"]
+        verify --> response(["Answer, citations<br/>and highlights"])
     end
+
+    bq -.-> retrieve
+    gcs -.-> generate & verify
 ```
 
 The pipeline, using the default configuration:
