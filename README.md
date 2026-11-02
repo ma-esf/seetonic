@@ -10,8 +10,8 @@ PyMuPDF checks quoted text against the cited page's text layer and highlights ma
 presence, not whether the evidence supports the answer. For pages without a searchable text layer, usable
 model-estimated bounding boxes are marked `approximate`.
 
-Jev (TypeSafe) and Gemini Flash classify each question before retrieval. Questions routed to clarification or refusal
-receive a fixed response instead of proceeding to answer generation.
+Jev (TypeSafe) and Gemini Flash label each question before retrieval. Every question is answered, unless Gemini's
+safety filter blocks it or either model labels it an attack: then it receives a fixed refusal instead.
 
 Live: <https://seetonic-v77e2oesjq-lz.a.run.app>
 
@@ -31,7 +31,7 @@ Live: <https://seetonic-v77e2oesjq-lz.a.run.app>
 ```mermaid
 flowchart TB
     accTitle: How Seetonic answers a question about a PDF
-    accDescr: An upload stores the PDF and page images in Cloud Storage and page embeddings in BigQuery. A question is routed by Jev and Flash, then answered from the top three pages, and each quote is checked against the PDF's text.
+    accDescr: An upload stores the PDF and page images in Cloud Storage and page embeddings in BigQuery. A question is labelled by Jev and Flash and, unless refused, answered from the top three pages, and each quote is checked against the PDF's text.
 
     subgraph upload["POST /upload"]
         direction LR
@@ -46,8 +46,8 @@ flowchart TB
     subgraph ask["POST /ask"]
         direction LR
         question(["Question"]) -->|"question text"| route{"Route<br/>Jev + Flash"}
-        route -->|"clarify or refuse:<br/>decision label"| fixed(["Fixed response"])
-        route -->|"answer:<br/>question text"| retrieve["Embed question,<br/>retrieve top 3 pages"]
+        route -->|"blocked or attack:<br/>decision label"| fixed(["Fixed refusal"])
+        route -->|"any other label:<br/>question text"| retrieve["Embed question,<br/>retrieve top 3 pages"]
         retrieve -->|"question text,<br/>page numbers"| generate["Flash answers<br/>with citations"]
         generate -->|"answer, citations"| verify["Check quotes against<br/>the PDF's text"]
         verify -->|"answer, pages, citations<br/>with status and boxes"| response(["JSON response"])
@@ -67,9 +67,9 @@ The pipeline, using the default configuration:
    to PNG at 144 DPI and embed it with `gemini-embedding-2` as a 768-dimensional vector. Nothing is written until every
    page is rendered and embedded. The PDF and PNGs are then stored in Cloud Storage, and one row per page is written
    to BigQuery in a single load job.
-2. **Route.** Jev and Flash each classify the question as `answer`, `clarify`, `off_topic` or `attack`. Jev's label
-   determines the routing decision unless Flash labels the question `attack` or Gemini's safety filter blocks it.
-   Any decision other than `answer` produces a fixed clarification or refusal response. Only the question is
+2. **Route.** Jev and Flash each label the question `answer`, `clarify`, `off_topic` or `attack`. A question that
+   Gemini's safety filter blocks, or that either model labels `attack`, gets a fixed refusal. Every other question is
+   answered: a `clarify` or `off_topic` label is logged and shown, but does not stop the answer. Only the question is
    screened by the routing models; uploaded page content is passed to the answer model without this screening.
 3. **Retrieve.** Embed the question as text and use BigQuery `VECTOR_SEARCH` to retrieve up to three pages with the
    smallest cosine distance. The search is exact over the document's page embeddings; it does not use a vector index.
@@ -114,7 +114,7 @@ Metrics:
 - **Verified citations:** the number of citations with a quote matched on the cited page, out of all generated
   citations. This is a quote-verification measure, not a measure of answer correctness.
 
-Questions rejected by the router count as retrieval misses.
+Refused questions count as retrieval misses.
 
 | Document | No. of questions | hit@3 | MRR@3 | Verified citations |
 |---|---|---|---|---|
@@ -228,17 +228,17 @@ curl -H 'Content-Type: application/json' \
 
 | Field | Meaning |
 |---|---|
-| `answer` | The generated answer, or a fixed response for clarification or refusal. |
+| `answer` | The generated answer, or a fixed refusal. |
 | `pages` | Retrieved pages with cosine similarity, best first. Empty when refused. |
 | `citations[].status` | See [How it works](#how-it-works). Set by `verify.verify_citation`, not the model. |
 | `citations[].boxes` | Bounding boxes as `[x0, y0, x1, y1]` in page-image pixels at `DPI`, with the origin at the top left. One per matched text line, or a model-estimated box for `approximate` citations. Empty when `unverified`. |
 | `citations[].snippet_url` | A crop of the first box, or `null`. |
-| `decision` | The effective routing decision: `answer`, `clarify`, `off_topic`, `attack` or `blocked`. |
+| `decision` | `answer`, or the reason for a refusal: `blocked` or `attack`. |
 | `route` | Flash's classification, or `blocked` if Gemini's safety filter blocked the question. |
 | `jev_route`, `jev_confidence` | Jev's label and confidence. |
 
-For questions routed to answer generation, returns HTTP 404 if no pages are stored for `doc_id`. Clarification and
-refusal responses return HTTP 200 without checking whether the document exists.
+For answered questions, returns HTTP 404 if no pages are stored for `doc_id`. Refusals return HTTP 200 without
+checking whether the document exists.
 
 Returns HTTP 502 when a Gemini or Jev call fails or a model response does not match the required schema. A request
 that returns 502 can be retried.
