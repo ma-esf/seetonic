@@ -2,62 +2,84 @@
 
 Ask a PDF a question and see the evidence highlighted on the page.
 
-You upload a PDF of up to 50 pages and ask a question about it. Seetonic answers from the pages that best match the
-question. For every claim it gives the page, the exact quote and a short label, and highlights the quote on the page
-image. Gemini Flash writes the answer, but every quote is verified deterministically, with no LLM call: PyMuPDF
-searches the cited page's text layer for it (`app/verify.py`). Each citation's status comes from that check, not from
-the model.
+Visual RAG over PDFs of up to 50 pages, with citations checked in code. Pages are embedded as images. Gemini Flash
+answers from the top 3 and cites each claim as page, quote and label. PyMuPDF then searches every quote in the cited
+page's text layer and boxes it on the page image. A citation's status comes from that search, never from the model.
+Jev (TypeSafe) and Flash route each question first, and vague, off-topic and injection questions get a fixed reply.
 
-Before a question is answered, two models label it: Jev (TypeSafe) and Gemini Flash. Seetonic gives a fixed reply,
-without calling the answer model, to a question that is too vague, off topic, or an attempt to change or reveal the
-instructions.
+Live: <https://seetonic-v77e2oesjq-lz.a.run.app>
 
 ## Table of Contents
 
-- [Background](#background)
+- [How it works](#how-it-works)
+- [Evaluation](#evaluation)
 - [Install](#install)
-  - [Dependencies](#dependencies)
 - [Usage](#usage)
-  - [CLI](#cli)
-- [Configuration](#configuration)
-- [Deploy](#deploy)
-- [Data location](#data-location)
 - [Tests](#tests)
 - [API](#api)
-  - [`POST /upload`](#post-upload)
-  - [`POST /ask`](#post-ask)
-  - [`GET /files/{path}`](#get-filespath)
+- [Contributing](#contributing)
 - [License](#license)
 
-## Background
+## How it works
 
-The point is answers you can check. An LLM can hallucinate or misquote a citation and still state it with confidence,
-so Seetonic marks each citation `unverified` until the text-layer search finds the quote. Each one gets one of three
-statuses:
+One PDF, end to end:
+
+1. **Upload.** Validate (a PDF, no password, 1 to 50 pages), render each page to PNG at 144 DPI, and embed it with
+   `gemini-embedding-2` at 768 dimensions. Nothing is written until every page is embedded; then the PDF and PNGs go to
+   Cloud Storage and the rows to BigQuery in one load job.
+2. **Route.** Jev and Flash each label the question `answer`, `clarify`, `off_topic` or `attack`. Jev's label wins,
+   unless Flash says `attack` or Gemini's safety filter blocks the question. Only the question is screened: text in the
+   PDF reaches Flash unscreened.
+3. **Retrieve.** Embed the question as text and run an exact cosine `VECTOR_SEARCH` over the document's pages, top 3.
+4. **Answer.** Flash gets the 3 page images and returns the answer and its citations as JSON.
+5. **Verify.** PyMuPDF searches each quote on its page. Matches become pixel boxes, and the first is cropped as a
+   snippet.
+6. **Log.** Every reply, answered or refused, goes to BigQuery with the pages, statuses, latency and both labels.
+   A request that ends in a 404 or 502 writes no row, and a failed log write never fails the request.
+
+Citation statuses:
 
 | Status | Meaning |
 |---|---|
-| `verified` | The quote was found on the cited page's text layer, as whole words and whole numbers. Its boxes come from the PDF. |
-| `approximate` | The page has no text layer (a scan), so the box the model gave is shown instead. |
-| `unverified` | The quote was not found, or the cited page was not one of the pages the model was given. No box is shown. |
+| `verified` | The quote is on the cited page's text layer, as whole words and numbers. Boxes come from the PDF. |
+| `approximate` | The page has no text layer (a scan), so the model's box is shown. |
+| `unverified` | The quote is not on the page, the page was not one the model saw, or a scan's box falls off the page. No box. |
 
-How one PDF goes through the service:
+Stack: FastAPI, PyMuPDF, Gemini on Vertex AI, Jev on TypeSafe, Cloud Storage, BigQuery, Cloud Run. The frontend is
+one static HTML file with no build step.
 
-1. **Upload.** The PDF is checked (a real PDF, no password, 1 to 50 pages). Each page is rendered to a PNG at 144 DPI
-   and embedded as an image with `gemini-embedding-2`. Nothing is written until every page is rendered and embedded.
-   Then the PDF and the page images go to Cloud Storage, and one row per page goes to BigQuery in a single load job.
-2. **Label the question.** Jev and Flash each label the question `answer`, `clarify`, `off_topic` or `attack`. Jev's
-   label decides, but if Flash says `attack`, or Gemini's safety filter blocks the question, the question is refused.
-3. **Retrieve.** The question is embedded as text, and BigQuery `VECTOR_SEARCH` returns the 3 pages nearest to it by
-   cosine distance.
-4. **Answer.** Flash gets those page images and returns an answer and its citations as JSON.
-5. **Verify.** PyMuPDF searches each quote on its page and turns the matches into pixel boxes on the page image. For a
-   citation with a box, the first box is cropped out and saved as a snippet image.
-6. **Log.** Every question is written to a BigQuery table with the pages, the statuses, the latency and both labels. A
-   failed log write is printed to stderr and never costs the user the answer.
+Data stays in the EU: storage is in `europe-north1` and Gemini is called through the `eu` endpoint. The exception is
+the question text sent to Jev, since TypeSafe names no EU region. Page content never goes to Jev.
 
-Built with FastAPI, PyMuPDF, Gemini on Vertex AI (Agent Platform), Jev on TypeSafe, Cloud Storage, BigQuery and
-Cloud Run. The web page in `static/index.html` is plain HTML and JavaScript with no build step.
+## Evaluation
+
+- **Set:** 20 questions in `eval/questions.jsonl`, each labeled with the one page that answers it. 13 were drafted
+  from that page's text, so their wording may favour retrieval.
+- **Documents:** the 10-Q (`APPLE_10Q_Q3_2026.pdf`, 32 pages, 15 questions) and the statements
+  (`APPLE_Statements.pdf`, 3 pages, 5 questions).
+- **Run:** once, on 2026-11-01, with `gemini-embedding-2`, `gemini-3.8-flash` and top 3.
+
+Metrics:
+
+- **hit@3:** the share of questions whose labeled page is among the 3 pages retrieved. Also called top-3 retrieval
+  accuracy.
+- **MRR@3:** the mean of 1 / rank of the labeled page, counting 0 when it is not in the top 3. 1.00 means it always
+  ranked first.
+- **Verified citations:** citations whose quote was found on the cited page, out of all citations.
+
+| Document | No. of questions | hit@3 | MRR@3 | Verified citations |
+|---|---|---|---|---|
+| Both | 20 | 0.90 | 0.85 | 26 of 26 |
+| 10-Q | 15 | 0.87 | 0.83 | 21 of 21 |
+| Statements | 5 | 1.00 | 0.90 | 5 of 5 |
+
+1. **Read retrieval from the 10-Q.** The statements have 3 pages, so their hit@3 is 1.00 by construction.
+2. **Both misses are on the 10-Q:**
+   1. *Capital expenditures* (page 8): the page never says "capital expenditures", only "Payments for acquisition
+      of property, plant and equipment".
+   2. *Corporate bonds* (page 10, June 2026): page 11 holds the same table for September 2025 and ranked higher.
+      The model cited the retrieved pages: 4 verified quotes, wrong period.
+3. **Not measured:** answer correctness, scanned PDFs, and variance (one run of 20 questions).
 
 ## Install
 
@@ -67,129 +89,29 @@ cd seetonic
 uv sync
 ```
 
-`uv sync` creates `.venv` with the exact versions in `uv.lock`, including pytest.
-
-### Dependencies
-
-- Python 3.12 or later.
-- [uv](https://docs.astral.sh/uv/).
-- The [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) (`gcloud` and `bq`), logged in to a Google Cloud
-  project with billing on.
-- A TypeSafe API key for Jev.
-
-The service has no local storage. Even when it runs on your machine, it reads and writes the Cloud Storage bucket and
-the BigQuery tables, and it calls Gemini and Jev. So set up the cloud resources once:
-
-1. Create the secret that holds the TypeSafe key. `setup.sh` grants access to it but does not create it, so the key
-   never lands in a file:
-
-   ```sh
-   printf '%s' "$KEY" | gcloud secrets create typesafe-api-key --data-file=- --project seetonic-demo
-   ```
-
-2. Run `setup.sh`. It turns on the APIs, creates the `seetonic-run` service account and its roles, the bucket, the
-   BigQuery dataset and the `pages` and `questions` tables. It is safe to run again.
-
-   ```sh
-   GOOGLE_CLOUD_PROJECT=seetonic-demo ./setup.sh
-   ```
+Needs Python 3.12+, [uv](https://docs.astral.sh/uv/), the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
+and a TypeSafe API key. There is no local storage: a local server still uses Cloud Storage, BigQuery, Gemini and Jev.
+`setup.sh` provisions the project, `deploy.sh` deploys to Cloud Run, and every setting is an environment variable in
+`app/config.py`.
 
 ## Usage
 
-Run the service locally on your own Google login:
+Use the [live service](https://seetonic-v77e2oesjq-lz.a.run.app), or run it locally against a project that `setup.sh`
+has provisioned:
 
 ```sh
 gcloud auth application-default login
-export GOOGLE_CLOUD_PROJECT=seetonic-demo
-export TYPESAFE_API_KEY="$(gcloud secrets versions access latest --secret typesafe-api-key --project "$GOOGLE_CLOUD_PROJECT")"
+export TYPESAFE_API_KEY=...
 uv run uvicorn app.main:app --port 8080
 ```
 
-Open <http://localhost:8080>, upload a PDF, then ask a question. The answer lists each citation with its status, label,
-quote and snippet, and shows which label, Jev's or Flash's, decided the question. Click a citation to open its page
-beside the answer with the quote boxed; you can zoom and step through the citations there.
+Scripts in `scripts/`:
 
-Your own account needs the same access the service account has: Vertex AI, the bucket, and the BigQuery dataset.
+- `smoke.py <URL>`: end-to-end check of one upload and one question against the API contract.
+- `evaluate.py <URL>`: the [Evaluation](#evaluation) run. Needs `TOP_K=3` on the server.
+- `search.py <doc_id> "<question>"`: the pages retrieval picks, without calling the answer model.
 
-### CLI
-
-Each script takes the base URL of a running service, local or deployed.
-
-Check the whole path end to end. It builds a one-page PDF, uploads it, asks about it and checks every citation field
-against the API contract. It prints `PASS` and exits 0, or prints `FAIL` with the first problem and exits 1:
-
-```sh
-uv run python scripts/smoke.py http://localhost:8080
-```
-
-Measure retrieval and citations on the labeled set in `eval/questions.jsonl` (20 questions about the two Apple PDFs in
-`eval/pdfs/`). It prints one row per question, then hit@3, MRR@3 and the verification rate, overall and per PDF. The
-service must run with the default `TOP_K=3`. A busy model (HTTP 502 or a timeout) is retried up to 3 times, a minute
-apart:
-
-```sh
-uv run python scripts/evaluate.py http://localhost:8080
-```
-
-Both scripts upload PDFs and ask questions like a real user, so they write to the bucket and the BigQuery tables.
-
-See which pages retrieval picks for a question, without asking the answer model. It calls Gemini and BigQuery
-directly, so it needs the same login and settings as the service:
-
-```sh
-uv run python scripts/search.py <doc_id> "What were total liabilities?"
-```
-
-It prints one line per page: the page number and its cosine similarity, best first.
-
-## Configuration
-
-Every setting is an environment variable read in `app/config.py`. `setup.sh` and `deploy.sh` repeat the defaults,
-so a change to a default goes in all three.
-
-| Variable | Default | What it sets |
-|---|---|---|
-| `GOOGLE_CLOUD_PROJECT` | `seetonic-demo` | The Google Cloud project. |
-| `GOOGLE_CLOUD_LOCATION` | `eu` | The Gemini endpoint. `eu` keeps Gemini calls in the EU. |
-| `EMBEDDING_MODEL` | `gemini-embedding-2` | The model that embeds page images and questions. |
-| `EMBEDDING_SIZE` | `768` | The length of each embedding vector. |
-| `FLASH_MODEL` | `gemini-3.8-flash` | The model that labels questions and writes answers. |
-| `JEV_MODEL` | `jev-1.13.0` | The Jev model that labels questions. |
-| `TYPESAFE_API_KEY` | empty | The TypeSafe key. On Cloud Run it comes from the `typesafe-api-key` secret. |
-| `DPI` | `144` | The resolution pages are rendered at. Citation boxes are in pixels at this DPI. |
-| `TOP_K` | `3` | How many pages are retrieved and sent to the answer model. |
-| `MAX_PAGES` | `50` | The largest PDF accepted, in pages. |
-| `DATA_LOCATION` | `europe-north1` | The region of the bucket and the BigQuery dataset. |
-| `BUCKET` | `<project>-files` | The Cloud Storage bucket. |
-| `DATASET` | `seetonic` | The BigQuery dataset. |
-| `QUESTIONS_TABLE` | `questions` | The BigQuery table that logs each question. |
-
-`setup.sh` also reads `DATA_LOCATION`, `BUCKET`, `DATASET` and `QUESTIONS_TABLE`. `deploy.sh` also reads `REGION`
-(default `europe-north1`), the Cloud Run region.
-
-## Deploy
-
-After `setup.sh`, deploy to Cloud Run:
-
-```sh
-GOOGLE_CLOUD_PROJECT=seetonic-demo ./deploy.sh
-```
-
-It builds the image from the `Dockerfile` in Cloud Build, deploys the `seetonic` service and prints its URL. Every run
-deploys a new revision. The service runs as `seetonic-run`, scales from 0 to 2 instances, and takes one request per
-instance, because PyMuPDF is not thread-safe. That also caps the service at two requests at once, which bounds model
-spending. `.gcloudignore` uploads only the `Dockerfile`, `pyproject.toml`, `uv.lock`, `app/` and `static/`.
-
-Who may call the service is set in IAM, not by the script, so a redeploy keeps it open or closed. Check the deployed
-service with `scripts/smoke.py` and its URL.
-
-## Data location
-
-The PDFs, the page images, the snippets, the embeddings and the question log are stored in `DATA_LOCATION`
-(`europe-north1` by default). Gemini is called through the `eu` endpoint. TypeSafe names no EU region, so the text of
-each question is sent to Jev and may leave the EU. Page content is never sent to Jev.
-
-`/files/` serves only PNGs, so the uploaded PDF itself is never served back.
+`smoke.py` and `evaluate.py` write to the bucket and tables like real traffic.
 
 ## Tests
 
@@ -197,16 +119,16 @@ each question is sent to Jev and may leave the EU. Page content is never sent to
 uv run pytest
 ```
 
-The tests replace every model and cloud call, so they need no Google login and no TypeSafe key. They cover citation
-verification, PDF checks, how `/ask` combines the two labels and logs each question, and the evaluation metrics.
+Every model and cloud call is faked, so no credentials are needed. Covers citation verification, PDF validation,
+routing and logging in `/ask`, and the evaluation metrics.
 
 ## API
 
-The service has three routes. Everything else serves the web page from `static/`.
+Three routes; everything else serves `static/`.
 
 ### `POST /upload`
 
-Takes a multipart form with one field, `file`, holding the PDF.
+Multipart, one field `file`.
 
 ```sh
 curl -F file=@report.pdf http://localhost:8080/upload
@@ -216,8 +138,7 @@ curl -F file=@report.pdf http://localhost:8080/upload
 {"doc_id": "3f2a…", "pages": 12}
 ```
 
-Returns 400, with a message in `detail`, for a file that is not a PDF, a password-protected PDF, a PDF with no pages,
-or one over `MAX_PAGES`. If a model call fails during the upload, the request fails and nothing is stored.
+400 for a non-PDF, a password-protected PDF, an empty PDF or more than `MAX_PAGES` pages.
 
 ### `POST /ask`
 
@@ -250,22 +171,26 @@ curl -H 'Content-Type: application/json' \
 
 | Field | Meaning |
 |---|---|
-| `answer` | The model's answer, or the fixed reply when the question was refused. |
-| `pages` | The retrieved pages and their cosine similarity, best first. Empty when refused. |
-| `citations[].status` | `verified`, `approximate` or `unverified`, set by `verify.verify_citation`, not by the model. See [Background](#background). |
-| `citations[].boxes` | The quote's place as `[x0, y0, x1, y1]` in pixels on the page image at `DPI`, origin top left. One box per line. Empty when `unverified`. |
-| `citations[].snippet_url` | A cropped image of the first box, or `null` when there is no box. |
+| `answer` | The answer, or the fixed reply when refused. |
+| `pages` | Retrieved pages with cosine similarity, best first. Empty when refused. |
+| `citations[].status` | See [How it works](#how-it-works). Set by `verify.verify_citation`, not the model. |
+| `citations[].boxes` | `[x0, y0, x1, y1]` in pixels on the page image at `DPI`, origin top left, one per line. Empty when `unverified`. |
+| `citations[].snippet_url` | A crop of the first box, or `null`. |
 | `decision` | The label that decided: `answer`, `clarify`, `off_topic`, `attack` or `blocked`. |
-| `route` | Flash's label, or `blocked` when the safety filter blocked the question. |
-| `jev_route`, `jev_confidence` | Jev's label and its confidence. |
+| `route` | Flash's label, or `blocked` by the safety filter. |
+| `jev_route`, `jev_confidence` | Jev's label and confidence. |
 
-Returns 404 when no pages are stored for `doc_id`, and 502 when Gemini or Jev fails or the answer does not fit the
-citation format. A 502 is worth asking again.
+404 when `doc_id` has no pages. 502 when Gemini or Jev fails or the answer does not fit the citation format; it is
+safe to retry.
 
 ### `GET /files/{path}`
 
-Serves a PNG from the bucket: a page image at `/files/<doc_id>/pages/<page>.png`, or a snippet from `snippet_url`.
-Any other path returns 404.
+A page image at `/files/<doc_id>/pages/<page>.png`, or a snippet from `snippet_url`. Only PNGs are served, never
+the source PDF; anything else is 404.
+
+## Contributing
+
+Issues are welcome; pull requests are not expected.
 
 ## License
 
