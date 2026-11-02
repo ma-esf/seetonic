@@ -29,23 +29,37 @@ Live: <https://seetonic-v77e2oesjq-lz.a.run.app>
 ## How it works
 
 ```mermaid
-flowchart LR
-    subgraph upload["Upload"]
-        direction TB
-        pdf["PDF"] --> prepare["Validate PDF<br/>Render and embed each page"]
-        prepare --> storage["Cloud Storage: PDF and page images<br/>BigQuery: page embeddings"]
+flowchart TB
+    accTitle: How Seetonic answers a question about a PDF
+    accDescr: An upload stores the PDF and page images in Cloud Storage and page embeddings in BigQuery. A question is routed by Jev and Flash, then answered from the top three pages, and each quote is checked against the PDF's text.
+
+    subgraph upload["POST /upload"]
+        direction LR
+        pdf(["PDF"]) -->|"PDF bytes"| prepare["Validate, render<br/>and embed each page"]
     end
 
-    subgraph ask["Question"]
-        direction TB
-        question["Question"] --> route{"Route: Jev, then Flash"}
-        route -->|"Clarify or refuse"| fixed["Fixed response"]
-        route -->|"Answer"| retrieve["Embed question<br/>Retrieve up to 3 pages from BigQuery"]
-        retrieve --> generate["Flash generates answer and citations<br/>from retrieved page images"]
-        generate --> verify["Check quotes and assign citation statuses"]
-        verify --> response["Answer and citations"]
+    gcs[("Cloud Storage<br/>PDF, page images, snippets")]
+    bq[("BigQuery<br/>page embeddings")]
+    prepare -->|"PDF, one PNG per page"| gcs
+    prepare -->|"one embedding per page"| bq
+
+    subgraph ask["POST /ask"]
+        direction LR
+        question(["Question"]) -->|"question text"| route{"Route<br/>Jev + Flash"}
+        route -->|"clarify or refuse:<br/>decision label"| fixed(["Fixed response"])
+        route -->|"answer:<br/>question text"| retrieve["Embed question,<br/>retrieve top 3 pages"]
+        retrieve -->|"question text,<br/>page numbers"| generate["Flash answers<br/>with citations"]
+        generate -->|"answer, citations"| verify["Check quotes against<br/>the PDF's text"]
+        verify -->|"answer, pages, citations<br/>with status and boxes"| response(["JSON response"])
     end
+
+    bq -.->|"page numbers, scores"| retrieve
+    gcs -.->|"page PNGs"| generate
+    gcs -.->|"source PDF"| verify
+    verify -->|"snippet PNG"| gcs
 ```
+
+Solid arrows are steps and writes; dotted arrows are reads. Each label names what the arrow carries.
 
 The pipeline, using the default configuration:
 
