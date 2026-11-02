@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Seetonic System Design",
+    "locale": "en",
+    "output": "docs/system-design.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/ma-esf/seetonic.git",
+      "revision": "5b9c60ece2131b710be91e00af1057084cb68dd9",
+      "provider": "github"
+    },
+    "views": [
+      {
+        "id": "upload",
+        "label": "Upload a PDF",
+        "focus": ["ui", "main", "pdf", "gemini", "vertex", "store", "gcs", "bq_pages"],
+        "note": "Validate, render and embed every page first; only then write the PDF + PNGs to Cloud Storage and all rows in one load job."
+      },
+      {
+        "id": "ask",
+        "label": "Ask a question",
+        "focus": ["ui", "main", "jev", "typesafe", "gemini", "vertex", "store", "bq_pages", "gcs", "verify", "pdf", "bq_questions"],
+        "note": "Label the question, search the top 3 pages, Flash answers from their images, PyMuPDF checks quotes, snippets saved, row logged."
+      },
+      {
+        "id": "refusal",
+        "label": "Routing and refusal",
+        "focus": ["main", "jev", "typesafe", "secrets", "gemini", "vertex", "store", "bq_questions"],
+        "note": "A safety block or an attack label from either model returns a fixed refusal, which is still logged. Jev sees only the question."
+      },
+      {
+        "id": "serve",
+        "label": "Page images and logging",
+        "focus": ["ui", "main", "store", "gcs", "bq_questions"],
+        "note": "GET /files serves only PNGs, never the source PDF. A failed log write is printed to stderr and never fails the request."
+      },
+      {
+        "id": "operate",
+        "label": "Deploy and operate",
+        "focus": ["build", "main", "secrets", "jev", "scripts"],
+        "note": "deploy.sh builds the Dockerfile in Cloud Build. The TypeSafe key arrives as an env var. smoke/evaluate call the live API."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "secrets", "type": "security", "label": "Secret Manager", "sublabel": "typesafe-api-key",
+      "pos": [350, 40], "size": [150, 60],
+      "sources": [
+        { "path": "deploy.sh", "line": 37, "end_line": 37, "label": "secret mounted as TYPESAFE_API_KEY" },
+        { "path": "setup.sh", "line": 38, "end_line": 40, "label": "secretAccessor for seetonic-run" },
+        { "path": "app/config.py", "line": 17, "end_line": 18, "label": "read from the environment" }
+      ]
+    },
+    {
+      "id": "vertex", "type": "cloud", "label": "Gemini on Vertex AI", "sublabel": "embedding-2 · 3.8-flash",
+      "pos": [770, 40], "size": [150, 60],
+      "sources": [
+        { "path": "app/gemini.py", "line": 9, "end_line": 14, "label": "Vertex AI client, 60 s timeout" },
+        { "path": "app/config.py", "line": 10, "end_line": 15, "label": "eu endpoint and model names" }
+      ]
+    },
+    {
+      "id": "typesafe", "type": "external", "label": "Jev on TypeSafe", "sublabel": "jev-1.13.0 · no EU region",
+      "pos": [40, 220], "size": [150, 60],
+      "sources": [
+        { "path": "app/jev.py", "line": 8, "end_line": 13, "label": "api.typesafe.ai, may leave the EU" },
+        { "path": "app/config.py", "line": 16, "end_line": 16, "label": "JEV_MODEL" }
+      ]
+    },
+    {
+      "id": "jev", "type": "backend", "label": "jev.py", "sublabel": "TypeSafe client · httpx",
+      "pos": [350, 220], "size": [150, 60],
+      "sources": [
+        { "path": "app/jev.py", "line": 11, "end_line": 13, "label": "Bearer key, 2 s timeouts" },
+        { "path": "app/jev.py", "line": 43, "end_line": 53, "label": "label_question" }
+      ]
+    },
+    {
+      "id": "gemini", "type": "backend", "label": "gemini.py", "sublabel": "embed · route · answer",
+      "pos": [770, 220], "size": [150, 60],
+      "sources": [
+        { "path": "app/gemini.py", "line": 54, "end_line": 68, "label": "embed page image or question" },
+        { "path": "app/gemini.py", "line": 71, "end_line": 85, "label": "route_question: label or blocked" },
+        { "path": "app/gemini.py", "line": 88, "end_line": 102, "label": "ask_model: answer + citations" }
+      ]
+    },
+    {
+      "id": "ui", "type": "frontend", "label": "Web UI", "sublabel": "static/index.html",
+      "pos": [40, 362], "size": [150, 60],
+      "sources": [
+        { "path": "static/index.html", "line": 300, "end_line": 302, "label": "POST /upload" },
+        { "path": "static/index.html", "line": 328, "end_line": 331, "label": "POST /ask" },
+        { "path": "static/index.html", "line": 428, "end_line": 430, "label": "GET /files page image" }
+      ]
+    },
+    {
+      "id": "main", "type": "backend", "label": "FastAPI app · main.py", "sublabel": "POST /upload · POST /ask · GET /files · static UI",
+      "pos": [350, 360], "size": [570, 64],
+      "sources": [
+        { "path": "app/main.py", "line": 27, "end_line": 49, "label": "POST /upload" },
+        { "path": "app/main.py", "line": 52, "end_line": 102, "label": "POST /ask" },
+        { "path": "app/main.py", "line": 127, "end_line": 140, "label": "GET /files and the static mount" }
+      ]
+    },
+    {
+      "id": "build", "type": "cloud", "label": "Cloud Build", "sublabel": "deploy.sh · Dockerfile",
+      "pos": [1030, 362], "size": [150, 60],
+      "sources": [
+        { "path": "deploy.sh", "line": 24, "end_line": 37, "label": "gcloud run deploy --source" },
+        { "path": "Dockerfile", "line": 1, "end_line": 15, "label": "image runs uvicorn app.main:app" }
+      ]
+    },
+    {
+      "id": "scripts", "type": "external", "label": "Eval scripts", "sublabel": "smoke.py · evaluate.py",
+      "pos": [40, 500], "size": [150, 60],
+      "sources": [
+        { "path": "scripts/smoke.py", "line": 69, "end_line": 71, "label": "one upload and one question" },
+        { "path": "scripts/evaluate.py", "line": 98, "end_line": 105, "label": "uploads the PDFs, asks the set" }
+      ]
+    },
+    {
+      "id": "pdf", "type": "backend", "label": "pdf.py", "sublabel": "validate · render · crop",
+      "pos": [350, 500], "size": [150, 60],
+      "sources": [
+        { "path": "app/pdf.py", "line": 4, "end_line": 18, "label": "page_count: reject bad PDFs" },
+        { "path": "app/pdf.py", "line": 21, "end_line": 27, "label": "render_page to PNG" },
+        { "path": "app/pdf.py", "line": 30, "end_line": 40, "label": "crop a snippet" }
+      ]
+    },
+    {
+      "id": "store", "type": "backend", "label": "store.py", "sublabel": "Cloud Storage + BigQuery",
+      "pos": [560, 500], "size": [150, 60],
+      "sources": [
+        { "path": "app/store.py", "line": 7, "end_line": 23, "label": "clients, tables, search query" },
+        { "path": "app/store.py", "line": 26, "end_line": 41, "label": "files and the pages load job" },
+        { "path": "app/store.py", "line": 44, "end_line": 61, "label": "question log and vector search" }
+      ]
+    },
+    {
+      "id": "verify", "type": "backend", "label": "verify.py", "sublabel": "quote → status + boxes",
+      "pos": [770, 500], "size": [150, 60],
+      "sources": [
+        { "path": "app/verify.py", "line": 25, "end_line": 65, "label": "verify_citation" },
+        { "path": "app/main.py", "line": 88, "end_line": 99, "label": "called per citation" }
+      ]
+    },
+    {
+      "id": "gcs", "type": "database", "label": "Cloud Storage", "sublabel": "PDF · page PNGs · snippets",
+      "pos": [350, 650], "size": [150, 60],
+      "sources": [
+        { "path": "setup.sh", "line": 42, "end_line": 46, "label": "bucket in DATA_LOCATION" },
+        { "path": "app/main.py", "line": 45, "end_line": 47, "label": "source.pdf and pages/N.png" },
+        { "path": "app/main.py", "line": 96, "end_line": 97, "label": "snippets/ written on /ask" }
+      ]
+    },
+    {
+      "id": "bq_pages", "type": "database", "label": "BigQuery · pages", "sublabel": "one 768-d vector per page",
+      "pos": [560, 650], "size": [150, 60],
+      "sources": [
+        { "path": "setup.sh", "line": 48, "end_line": 52, "label": "dataset and pages table" },
+        { "path": "app/store.py", "line": 35, "end_line": 41, "label": "all-or-nothing load job" },
+        { "path": "app/store.py", "line": 12, "end_line": 23, "label": "exact VECTOR_SEARCH by doc_id" }
+      ]
+    },
+    {
+      "id": "bq_questions", "type": "database", "label": "BigQuery · questions", "sublabel": "answers + refusals log",
+      "pos": [770, 650], "size": [150, 60],
+      "sources": [
+        { "path": "setup.sh", "line": 53, "end_line": 57, "label": "questions table" },
+        { "path": "app/store.py", "line": 44, "end_line": 50, "label": "streaming insert, 5 s cap" },
+        { "path": "app/main.py", "line": 105, "end_line": 124, "label": "log row; failure goes to stderr" }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region", "label": "Google Cloud project",
+      "wraps": ["secrets", "vertex", "jev", "gemini", "main", "build", "pdf", "store", "verify", "gcs", "bq_pages", "bq_questions"],
+      "pad": 26
+    },
+    {
+      "kind": "region", "label": "europe-north1",
+      "wraps": ["jev", "gemini", "main", "pdf", "store", "verify", "gcs", "bq_pages", "bq_questions"],
+      "pad": 18
+    },
+    {
+      "kind": "security-group", "label": "Cloud Run · seetonic-run · concurrency 1",
+      "wraps": ["jev", "gemini", "main", "pdf", "store", "verify"],
+      "pad": 10
+    },
+    {
+      "kind": "region", "label": "eu multi-region",
+      "wraps": ["vertex"],
+      "pad": 10
+    }
+  ],
+  "connections": [
+    { "id": "ui-main", "from": "ui", "to": "main", "label": "upload · ask · files", "variant": "emphasis" },
+    { "id": "scripts-main", "from": "scripts", "to": "main", "label": "HTTPS" },
+    { "id": "main-jev", "from": "main", "to": "jev", "label": "label question" },
+    { "id": "main-gemini", "from": "main", "to": "gemini", "label": "embed · route · answer", "variant": "emphasis" },
+    { "id": "jev-typesafe", "from": "jev", "to": "typesafe", "label": "question text", "variant": "security" },
+    { "id": "gemini-vertex", "from": "gemini", "to": "vertex", "label": "page images, question" },
+    { "id": "secrets-jev", "from": "secrets", "to": "jev", "label": "API key (env)", "variant": "security" },
+    { "id": "build-main", "from": "build", "to": "main", "label": "new revision", "variant": "dashed" },
+    { "id": "main-pdf", "from": "main", "to": "pdf", "label": "render · crop" },
+    { "id": "main-store", "from": "main", "to": "store", "label": "save · load · search · log", "variant": "emphasis" },
+    { "id": "main-verify", "from": "main", "to": "verify", "label": "check quotes" },
+    { "id": "store-gcs", "from": "store", "to": "gcs", "label": "PDF · PNGs" },
+    { "id": "store-bq-pages", "from": "store", "to": "bq_pages", "label": "load · VECTOR_SEARCH" },
+    { "id": "store-bq-questions", "from": "store", "to": "bq_questions", "label": "streaming insert" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald", "title": "Request rules",
+      "items": [
+        "/upload writes nothing until every page is rendered and embedded",
+        "Blocked or attack-labelled questions get a fixed refusal; clarify and off_topic are only shown",
+        "Model errors return 502 and an unknown doc_id 404; neither is logged",
+        "Code, not the model, sets each citation's status and boxes"
+      ]
+    },
+    {
+      "dot": "cyan", "title": "Runtime limits",
+      "items": [
+        "Cloud Run: min 1, max 2 instances, one request each (PyMuPDF is not thread-safe)",
+        "Gemini calls time out at 60 s, inside Cloud Run's 300 s request limit",
+        "Retrieval is an exact cosine search over one document's pages, no vector index"
+      ]
+    },
+    {
+      "dot": "rose", "title": "Data residency",
+      "items": [
+        "Cloud Run, Cloud Storage and BigQuery run in europe-north1",
+        "Gemini is called through the eu multi-region endpoint",
+        "Only the question text goes to Jev; TypeSafe names no EU region"
+      ]
+    },
+    {
+      "dot": "amber", "title": "Provisioning and scripts",
+      "items": [
+        "setup.sh enables APIs, creates the seetonic-run account and its roles, the bucket, dataset and both tables",
+        "smoke.py and evaluate.py call the live API and write real data",
+        "search.py imports gemini.py and store.py and queries Gemini and BigQuery directly"
+      ]
+    }
+  ]
+}
