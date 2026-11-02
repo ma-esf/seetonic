@@ -144,8 +144,8 @@ It prints one line per page: the page number and its cosine similarity, best fir
 
 ## Configuration
 
-Every setting is an environment variable read in `app/config.py`. `setup.sh` and `deploy.sh` repeat the defaults,
-so a change to a default goes in all three.
+Every setting is an environment variable read in `app/config.py`. `deploy.sh` repeats every default, `setup.sh` the
+project and storage ones and `scripts/evaluate.py` `TOP_K`, so a change to a default goes there too, and in this table.
 
 | Variable | Default | What it sets |
 |---|---|---|
@@ -176,9 +176,10 @@ GOOGLE_CLOUD_PROJECT=seetonic-demo ./deploy.sh
 ```
 
 It builds the image from the `Dockerfile` in Cloud Build, deploys the `seetonic` service and prints its URL. Every run
-deploys a new revision. The service runs as `seetonic-run`, scales from 0 to 2 instances, and takes one request per
-instance, because PyMuPDF is not thread-safe. That also caps the service at two requests at once, which bounds model
-spending. `.gcloudignore` uploads only the `Dockerfile`, `pyproject.toml`, `uv.lock`, `app/` and `static/`.
+deploys a new revision. The service runs as `seetonic-run`, keeps one instance running so no request waits for a cold
+start, scales up to 2 instances, and takes one request per instance, because PyMuPDF is not thread-safe. That also caps
+the service at two requests at once, which caps the rate of model calls. `.gcloudignore` uploads only the
+`Dockerfile`, `pyproject.toml`, `uv.lock`, `app/` and `static/`.
 
 Who may call the service is set in IAM, not by the script, so a redeploy keeps it open or closed. Check the deployed
 service with `scripts/smoke.py` and its URL.

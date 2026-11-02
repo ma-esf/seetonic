@@ -1,7 +1,7 @@
 """Every setting, read from the environment with a default.
 
-deploy.sh repeats these defaults, setup.sh repeats the project and storage ones, and scripts/evaluate.py repeats
-TOP_K: change them there too.
+deploy.sh and the README's Configuration table repeat these defaults, setup.sh repeats the project and storage ones,
+and scripts/evaluate.py repeats TOP_K: change them there too.
 """
 
 import os
@@ -16,7 +16,8 @@ FLASH_MODEL = os.environ.get("FLASH_MODEL", "gemini-3.8-flash")
 JEV_MODEL = os.environ.get("JEV_MODEL", "jev-1.13.0")
 # Cloud Run reads it from Secret Manager; empty is enough for the tests.
 TYPESAFE_API_KEY = os.environ.get("TYPESAFE_API_KEY", "")
-# Page PNGs keep the DPI they were uploaded at: changing it misplaces highlights on documents already uploaded.
+# Page PNGs keep the DPI they were uploaded at: changing it misplaces highlights and snippets on documents already
+# uploaded.
 DPI = int(os.environ.get("DPI", "144"))
 TOP_K = int(os.environ.get("TOP_K", "3"))
 EMBEDDING_SIZE = int(os.environ.get("EMBEDDING_SIZE", "768"))

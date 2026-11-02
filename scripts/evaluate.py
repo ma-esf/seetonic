@@ -57,8 +57,8 @@ def verification_rate(statuses: list[str]) -> float:
 def _post(client: httpx.Client, path: str, **kwargs) -> dict:
     """POST and return the JSON reply. A 502 or a timeout is retried RETRIES times; any other failure stops the run.
 
-    A 502 is a busy model, a Jev failure or an answer that failed the citation format, so such an answer is asked
-    again and never counted.
+    A 502 is a Gemini or Jev failure, or a model reply that did not fit its format, so such an answer is asked again
+    and never counted.
     """
     for attempt in range(1 + RETRIES):
         if attempt:
