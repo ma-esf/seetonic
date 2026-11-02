@@ -28,38 +28,42 @@ Live: <https://seetonic-v77e2oesjq-lz.a.run.app>
 
 ## How it works
 
+### Upload a PDF
+
+`POST /upload` prepares every page before writing to storage, then returns a `doc_id` for subsequent questions.
+
 ```mermaid
 flowchart TB
-    accTitle: How Seetonic answers a question about a PDF
-    accDescr: An upload stores the PDF and page images in Cloud Storage and page embeddings in BigQuery. A question is labelled by Jev and Flash and, unless refused, answered from the top three pages, and each quote is checked against the PDF's text.
+    accTitle: Uploading a PDF to Seetonic
+    accDescr: POST /upload validates the PDF, then renders and embeds every page before writing anything. Cloud Storage holds the source PDF and page images; BigQuery holds one embedding per page. The response includes a document ID for later questions.
 
-    subgraph upload["POST /upload"]
-        direction LR
-        pdf(["PDF"]) -->|"PDF bytes"| prepare["Validate, render<br/>and embed each page"]
-    end
-
-    gcs[("Cloud Storage<br/>PDF, page images, snippets")]
-    bq[("BigQuery<br/>page embeddings")]
-    prepare -->|"PDF, one PNG per page"| gcs
-    prepare -->|"one embedding per page"| bq
-
-    subgraph ask["POST /ask"]
-        direction LR
-        question(["Question"]) -->|"question text"| route{"Route<br/>Jev + Flash"}
-        route -->|"blocked or attack:<br/>decision label"| fixed(["Fixed refusal"])
-        route -->|"any other label:<br/>question text"| retrieve["Embed question,<br/>retrieve top 3 pages"]
-        retrieve -->|"question text,<br/>page numbers"| generate["Flash answers<br/>with citations"]
-        generate -->|"answer, citations"| verify["Check quotes against<br/>the PDF's text"]
-        verify -->|"answer, pages, citations<br/>with status and boxes"| response(["JSON response"])
-    end
-
-    bq -.->|"page numbers, scores"| retrieve
-    gcs -.->|"page PNGs"| generate
-    gcs -.->|"source PDF"| verify
-    verify -->|"snippet PNG"| gcs
+    pdf(["PDF"]) --> prepare["Validate PDF<br/>Render and embed pages"]
+    prepare --> gcs[("Cloud Storage<br/>PDF + page PNGs")]
+    prepare --> bq[("BigQuery<br/>page embeddings")]
 ```
 
-Solid arrows are steps and writes; dotted arrows are reads. Each label names what the arrow carries.
+### Ask a question
+
+`POST /ask` takes a question and its `doc_id`. Only the question text is sent to the routing models.
+Retrieval is restricted to that document; the diagram shows the default limit of three pages.
+
+```mermaid
+flowchart TB
+    accTitle: Answering a question about an uploaded PDF
+    accDescr: Jev and Flash label the question. A Gemini safety block or an attack label from either model produces a fixed JSON refusal. Otherwise, Seetonic embeds the question and retrieves up to three pages from the specified document in BigQuery. Flash answers using their images. Quotes are checked against the PDF text; for pages without searchable text, usable model-estimated boxes are marked approximate. The JSON response includes the answer, retrieved pages and citations with statuses and boxes.
+
+    question(["Question + document ID"]) --> route["Label question<br/>Jev + Flash"]
+    route -->|"Otherwise"| retrieve["Embed question<br/>Search this document<br/>BigQuery: up to 3 pages"]
+    route -->|"Blocked or attack"| fixed(["Fixed refusal<br/>(JSON)"])
+    retrieve --> generate["Flash: answer + citations<br/>from page images"]
+    generate --> verify["Check quotes in PDF text<br/>No text layer: approximate<br/>model boxes if usable"]
+    verify --> response(["JSON: answer, pages,<br/>citations + status + boxes"])
+```
+
+Page images and the source PDF are read from Cloud Storage. Citations with usable boxes also get a cropped snippet
+saved there. Neither quote matching nor an approximate box establishes that the answer is correct.
+
+### Pipeline details
 
 The pipeline, using the default configuration:
 
