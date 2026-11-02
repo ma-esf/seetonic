@@ -16,13 +16,7 @@ from app import config, gemini, jev, pdf, store, verify
 
 app = FastAPI()
 
-# The fixed reply for each label but "answer", which runs the full pipeline.
-REJECTIONS = {
-    "clarify": "The question is not clear enough. Ask it again with more detail.",
-    "off_topic": "This question is not about the document. Ask about its content.",
-    "attack": "This question cannot be answered.",
-    "blocked": "This question cannot be answered.",
-}
+REFUSAL = "This question cannot be answered."
 
 
 class Question(BaseModel):
@@ -57,21 +51,26 @@ def upload(file: UploadFile) -> dict:
 
 @app.post("/ask")
 def ask(body: Question) -> dict:
-    """Give a fixed reply to a question Jev does not label "answer", or Flash blocks or labels "attack", else answer
-    from the document's top pages. Flash's label is logged and returned either way. Code, not the model, decides each
-    citation's status and boxes."""
+    """Answer from the document's top pages, unless Flash blocks the question or either model labels it "attack": then
+    give a fixed reply. Both labels are logged and returned either way. Code, not the model, decides each citation's
+    status and boxes."""
     start = time.perf_counter()
     try:
         jev_label = jev.label_question(body.question)
-        # On every question, since Flash's label can override Jev's.
         flash_label = gemini.route_question(body.question)
         # A question the safety filter blocked, or either model calls an attack, must not reach the answer model.
-        decision = flash_label if flash_label in ("blocked", "attack") else jev_label[0]
+        # clarify and off_topic are only shown, so a label one model gets wrong cannot hide the answer.
+        if flash_label in ("blocked", "attack"):
+            decision = flash_label
+        elif jev_label[0] == "attack":
+            decision = "attack"
+        else:
+            decision = "answer"
         # The last three are the log's column names; decision is not logged, as it follows from route and jev_route.
         labels = {"decision": decision, "route": flash_label, "jev_route": jev_label[0], "jev_confidence": jev_label[1]}
         if decision != "answer":
             log_question(body, start, flash_label, jev_label, [], [])
-            return {"answer": REJECTIONS[decision], "pages": [], "citations": [], **labels}
+            return {"answer": REFUSAL, "pages": [], "citations": [], **labels}
         vector = gemini.embed_text(body.question)
     except (APIError, ValidationError, httpx.HTTPError):
         raise HTTPException(502, "The model is unavailable. Ask again.")
@@ -83,7 +82,7 @@ def ask(body: Question) -> dict:
         reply = gemini.ask_model(body.question, list(pngs.items()))
     except ValidationError:
         raise HTTPException(502, "The model's answer did not fit the citation format. Ask again.")
-    except APIError:
+    except (APIError, httpx.HTTPError):
         raise HTTPException(502, "The model is unavailable. Ask again.")
 
     citations = []

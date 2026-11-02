@@ -384,15 +384,16 @@ function showAnswer(reply) {
   $("#result").hidden = false;
 }
 
-// The two routing steps in the server's order, read from the /ask reply alone. A decision that differs from Jev's
-// label came from Flash; when they match, Jev is shown as deciding.
+// The two labels in the server's order, read from the /ask reply alone. A label decides only a refusal (blocked, or
+// attack from either model); clarify and off_topic would reject, but the question is answered anyway.
 function steps(reply) {
   const code = text => el("code", "", text);
-  const flashDecided = reply.decision !== reply.jev_route;
+  const decided = label => reply.decision !== "answer" && label === reply.decision;
+  const note = label => decided(label) ? "✓ decided" : label === "answer" ? "" : "would reject";
   return [
-    { name: "Route", ok: !flashDecided, note: flashDecided ? "overruled" : "✓ decided",
+    { name: "Route", ok: decided(reply.jev_route), note: note(reply.jev_route),
       value: ["Jev: ", code(reply.jev_route), ` ${reply.jev_confidence.toFixed(2)}`] },
-    { name: "Shadow", ok: flashDecided, note: flashDecided ? "✓ decided" : "logged, not used",
+    { name: "Shadow", ok: decided(reply.route), note: note(reply.route),
       value: reply.route === "blocked" ? ["Flash: ", code("blocked"), " by the safety filter"] : ["Flash: ", code(reply.route)] },
   ];
 }
