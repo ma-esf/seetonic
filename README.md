@@ -28,6 +28,25 @@ Live: <https://seetonic-v77e2oesjq-lz.a.run.app>
 
 ## How it works
 
+```mermaid
+flowchart LR
+    subgraph upload["Upload"]
+        direction TB
+        pdf["PDF"] --> prepare["Validate PDF<br/>Render and embed each page"]
+        prepare --> storage["Cloud Storage: PDF and page images<br/>BigQuery: page embeddings"]
+    end
+
+    subgraph ask["Question"]
+        direction TB
+        question["Question"] --> route{"Route: Jev, then Flash"}
+        route -->|"Clarify or refuse"| fixed["Fixed response"]
+        route -->|"Answer"| retrieve["Embed question<br/>Retrieve up to 3 pages from BigQuery"]
+        retrieve --> generate["Flash generates answer and citations<br/>from retrieved page images"]
+        generate --> verify["Check quotes and assign citation statuses"]
+        verify --> response["Answer and citations"]
+    end
+```
+
 The pipeline, using the default configuration:
 
 1. **Upload.** Validate that the file is a PDF, is not password-protected and contains 1 to 50 pages. Render each page
