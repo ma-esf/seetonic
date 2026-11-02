@@ -1,20 +1,20 @@
-{"pdf": "eval/pdfs/APPLE_Statements.pdf", "question": "What was Apple's iPhone revenue in the quarter ended June 27, 2026?", "page": 1}
-{"pdf": "eval/pdfs/APPLE_Statements.pdf", "question": "How much did Apple spend on research and development in the third quarter of fiscal 2026?", "page": 1}
-{"pdf": "eval/pdfs/APPLE_Statements.pdf", "question": "What were Apple's total liabilities at June 27, 2026?", "page": 2}
-{"pdf": "eval/pdfs/APPLE_Statements.pdf", "question": "How much deferred revenue did Apple report at June 27, 2026?", "page": 2}
-{"pdf": "eval/pdfs/APPLE_Statements.pdf", "question": "How much did Apple spend buying back its own shares in the first nine months of fiscal 2026?", "page": 3}
-{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "How much did the European Commission fine Apple under the Digital Markets Act?", "page": 23}
-{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "What did the U.S. Supreme Court decide about tariffs in February 2026, and what did Apple do as a result?", "page": 17}
-{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "What were Apple's capital expenditures in the first nine months of fiscal 2026?", "page": 8}
-{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "What share of Apple's deferred revenue does it expect to turn into revenue within twelve months?", "page": 9}
-{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "How much did Apple have invested in corporate bonds, at fair value, as of June 27, 2026?", "page": 10}
-{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "What share of Apple's trade receivables was owed by mobile phone carriers at the end of June 2026?", "page": 12}
-{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "How much compensation cost for unvested stock awards did Apple still have to recognize at June 27, 2026, and over what period?", "page": 14}
-{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "How much operating profit did Apple's Greater China segment make in the quarter ended June 27, 2026?", "page": 15}
-{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "Which software releases did Apple announce during its third fiscal quarter of 2026?", "page": 16}
-{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "Why did iPad revenue drop in the June 2026 quarter?", "page": 18}
-{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "What gross margin percentage did Apple earn on hardware products in the June 2026 quarter, and what drove the change?", "page": 19}
-{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "What income tax rate did Apple report for the June 2026 quarter, and why was it below 21%?", "page": 20}
-{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "How much did Apple pay to clear the rest of the one-time tax on foreign earnings from the 2017 US tax reform?", "page": 21}
-{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "How much buyback capacity remained under Apple's May 2025 repurchase program at the end of June 2026?", "page": 27}
-{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "How many shares can Tim Cook sell under the trading plan he adopted in May 2026?", "page": 28}
+{"pdf": "eval/pdfs/APPLE_Statements.pdf", "question": "What was Apple's iPhone revenue in the quarter ended June 27, 2026?", "page": 1, "expect": [["54,252"]]}
+{"pdf": "eval/pdfs/APPLE_Statements.pdf", "question": "How much did Apple spend on research and development in the third quarter of fiscal 2026?", "page": 1, "expect": [["11,729"]]}
+{"pdf": "eval/pdfs/APPLE_Statements.pdf", "question": "What were Apple's total liabilities at June 27, 2026?", "page": 2, "expect": [["275,746"]]}
+{"pdf": "eval/pdfs/APPLE_Statements.pdf", "question": "How much deferred revenue did Apple report at June 27, 2026?", "page": 2, "expect": [["9,538"]]}
+{"pdf": "eval/pdfs/APPLE_Statements.pdf", "question": "How much did Apple spend buying back its own shares in the first nine months of fiscal 2026?", "page": 3, "expect": [["62,094"]]}
+{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "How much did the European Commission fine Apple under the Digital Markets Act?", "page": 23, "expect": [["500 million"]]}
+{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "What did the U.S. Supreme Court decide about tariffs in February 2026, and what did Apple do as a result?", "page": 17, "expect": [["striking down", "struck down"], ["refund", "refunds"]]}
+{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "What were Apple's capital expenditures in the first nine months of fiscal 2026?", "page": 8, "expect": [["6,799"]]}
+{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "What share of Apple's deferred revenue does it expect to turn into revenue within twelve months?", "page": 9, "expect": [["64%", "64 percent"]]}
+{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "How much did Apple have invested in corporate bonds, at fair value, as of June 27, 2026?", "page": 10, "expect": [["49,091"]]}
+{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "What share of Apple's trade receivables was owed by mobile phone carriers at the end of June 2026?", "page": 12, "expect": [["27%", "27 percent"]]}
+{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "How much compensation cost for unvested stock awards did Apple still have to recognize at June 27, 2026, and over what period?", "page": 14, "expect": [["26.7 billion"], ["2.7 years"]]}
+{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "How much operating profit did Apple's Greater China segment make in the quarter ended June 27, 2026?", "page": 15, "expect": [["7,406"]]}
+{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "Which software releases did Apple announce during its third fiscal quarter of 2026?", "page": 16, "expect": [["iOS 27"], ["macOS® 27", "macOS 27"], ["iPadOS® 27", "iPadOS 27"], ["watchOS® 27", "watchOS 27"], ["visionOS® 27", "visionOS 27"], ["tvOS® 27", "tvOS 27"]]}
+{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "Why did iPad revenue drop in the June 2026 quarter?", "page": 18, "expect": [["iPad mini"], ["iPad Air"]]}
+{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "What gross margin percentage did Apple earn on hardware products in the June 2026 quarter, and what drove the change?", "page": 19, "expect": [["40.1%", "40.1 percent"], ["mix"], ["tariff refunds", "tariff refund"]]}
+{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "What income tax rate did Apple report for the June 2026 quarter, and why was it below 21%?", "page": 20, "expect": [["17.9%", "17.9 percent"], ["foreign earnings"], ["R&D credit", "research and development credit"], ["share-based compensation", "stock-based compensation"]]}
+{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "How much did Apple pay to clear the rest of the one-time tax on foreign earnings from the 2017 US tax reform?", "page": 21, "expect": [["8.8 billion"]]}
+{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "How much buyback capacity remained under Apple's May 2025 repurchase program at the end of June 2026?", "page": 27, "expect": [["38.0 billion", "38 billion"]]}
+{"pdf": "eval/pdfs/APPLE_10Q_Q3_2026.pdf", "question": "How many shares can Tim Cook sell under the trading plan he adopted in May 2026?", "page": 28, "expect": [["16,250"]]}

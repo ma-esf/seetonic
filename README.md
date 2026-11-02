@@ -113,24 +113,31 @@ Metrics:
   not in the top three. A score of 1.00 means the reference page ranked first for every question.
 - **Verified citations:** the number of citations with a quote matched on the cited page, out of all generated
   citations. This is a quote-verification measure, not a measure of answer correctness.
+- **Answer accuracy:** the proportion of answers that contain every expected fact. Each question lists its facts, each
+  with the spellings it accepts, such as `49,091` for the corporate bonds question. Case does not matter, and a figure
+  never matches inside a longer number. For the "why" and "which" questions only the key phrases the page gives are
+  checked, so a correct answer there holds the key facts but may not be complete. The facts were drafted by an LLM
+  from the reference page and checked by the author line by line.
 
-Questions rejected by the router count as retrieval misses.
+Questions rejected by the router count as retrieval misses and as wrong answers.
 
-| Document | No. of questions | hit@3 | MRR@3 | Verified citations |
-|---|---|---|---|---|
-| Both | 20 | 0.90 | 0.85 | 26 of 26 |
-| 10-Q | 15 | 0.87 | 0.83 | 21 of 21 |
-| Statements | 5 | 1.00 | 0.90 | 5 of 5 |
+| Document | No. of questions | hit@3 | MRR@3 | Verified citations | Answer accuracy |
+|---|---|---|---|---|---|
+| Both | 20 | 0.90 | 0.85 | 26 of 26 | 0.90 (18 of 20) |
+| 10-Q | 15 | 0.87 | 0.83 | 21 of 21 | 0.87 (13 of 15) |
+| Statements | 5 | 1.00 | 0.90 | 5 of 5 | 1.00 (5 of 5) |
 
 1. **Use the 10-Q results to assess retrieval performance.** The statements contain only three pages, so retrieving
    all three makes their hit@3 1.00 by construction.
-2. **Both misses are on the 10-Q:**
+2. **Both misses are on the 10-Q, and they are also the two wrong answers:**
    1. *Capital expenditures* (page 8): the reference page uses "Payments for acquisition of property, plant and
-      equipment" rather than the phrase "capital expenditures".
+      equipment" rather than the phrase "capital expenditures". The model said the pages it got hold no capital
+      expenditures and gave no citation.
    2. *Corporate bonds* (page 10, June 2026): page 11 contains the corresponding table for September 2025 and ranked
-      higher. The answer used the wrong reporting period despite producing four verified quotes.
-3. **Not evaluated systematically:** answer correctness, performance on scanned PDFs and run-to-run variability.
-   These results come from one run of 20 questions.
+      higher. The model said the June 2026 figure was not disclosed and gave $46,560 million, the September 2025
+      figure, with three verified citations. Every citation in the run is verified, and that answer is still wrong.
+3. **Not evaluated systematically:** performance on scanned PDFs and run-to-run variability. Answer accuracy checks
+   key facts, not completeness. These results come from one run of 20 questions.
 
 ## Install
 
