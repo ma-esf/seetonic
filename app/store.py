@@ -45,7 +45,7 @@ def log_question(row: dict) -> None:
     # A streaming insert: a load job per question would use up the daily load-job quota. The 5 s retry deadline
     # plus the 5 s request timeout cap this near 10 s; the default retry runs 600 s, past Cloud Run's 300 s timeout.
     errors = bq.insert_rows_json(QUESTIONS_TABLE, [row], retry=bigquery.DEFAULT_RETRY.with_timeout(5), timeout=5)
-    # insert_rows_json returns its errors instead of raising.
+    # Row-level insertion errors are returned rather than raised; API and transport failures can still raise.
     if errors:
         raise RuntimeError(f"BigQuery rejected the question row: {errors}")
 
