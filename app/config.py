@@ -1,7 +1,7 @@
 """Every setting, read from the environment with a default.
 
-deploy.sh and the README's Configuration table repeat these defaults, setup.sh repeats the project and storage ones,
-and scripts/evaluate.py repeats TOP_K: change them there too.
+deploy.sh repeats these defaults, setup.sh repeats the project and storage ones, and scripts/evaluate.py repeats
+TOP_K: change them there too.
 """
 
 import os
