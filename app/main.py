@@ -82,7 +82,7 @@ def ask(body: Question) -> dict:
         reply = gemini.ask_model(body.question, list(pngs.items()))
     except ValidationError:
         raise HTTPException(502, "The model's answer did not fit the citation format. Ask again.")
-    except APIError:
+    except (APIError, httpx.HTTPError):
         raise HTTPException(502, "The model is unavailable. Ask again.")
 
     citations = []

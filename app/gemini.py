@@ -7,8 +7,11 @@ from pydantic import BaseModel, Field
 from app import config
 
 # Set in code, so neither GOOGLE_GENAI_USE_VERTEXAI nor an API key in the environment
-# can move calls off Agent Platform.
-client = genai.Client(vertexai=True, project=config.PROJECT, location=config.LOCATION)
+# can move calls off Agent Platform. The timeout is in ms: 60 s per call keeps /ask's three Gemini calls inside
+# Cloud Run's 300 s request timeout.
+client = genai.Client(
+    vertexai=True, project=config.PROJECT, location=config.LOCATION, http_options=types.HttpOptions(timeout=60_000)
+)
 
 INSTRUCTION = (
     "Answer the question using only the page images. If the pages do not hold the answer, say so and give no "

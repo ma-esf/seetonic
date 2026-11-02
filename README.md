@@ -240,8 +240,8 @@ curl -H 'Content-Type: application/json' \
 For answered questions, returns HTTP 404 if no pages are stored for `doc_id`. Refusals return HTTP 200 without
 checking whether the document exists.
 
-Returns HTTP 502 when a Gemini or Jev call fails or a model response does not match the required schema. A request
-that returns 502 can be retried.
+Returns HTTP 502 when a Gemini or Jev call fails or times out, or a model response does not match the required
+schema. A request that returns 502 can be retried.
 
 ### `GET /files/{path}`
 
