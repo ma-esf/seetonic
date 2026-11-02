@@ -18,7 +18,7 @@ import pymupdf
 
 ROOT = Path(__file__).resolve().parent.parent  # the PDF paths in the labeled set are relative to the repo root
 QUESTIONS = ROOT / "eval" / "questions.jsonl"
-RETRIES = 3  # with WAIT_SECONDS, waits up to 3 minutes for a busy model (a Vertex 429)
+RETRIES = 3  # Each retry waits WAIT_SECONDS; request time is additional.
 WAIT_SECONDS = 60
 TOP_K = 3  # the metrics are @3, so the server must keep its default TOP_K
 
@@ -95,7 +95,6 @@ if __name__ == "__main__":
             if not 1 <= pair["page"] <= doc.page_count:
                 sys.exit(f"FAIL: {pair['pdf']} has no page {pair['page']}: {pair['question']}")
     results = []
-    # Well past one upload of the 32-page 10-Q, so only a hung request runs into it.
     with httpx.Client(base_url=sys.argv[1].rstrip("/"), timeout=120) as client:
         uploads = {}
         for pdf in dict.fromkeys(pair["pdf"] for pair in pairs):
