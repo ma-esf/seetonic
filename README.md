@@ -28,40 +28,33 @@ Live: <https://seetonic-v77e2oesjq-lz.a.run.app>
 
 ## How it works
 
-### Upload a PDF
+### Components
 
-`POST /upload` prepares every page before writing to storage, then returns a `doc_id` for subsequent questions.
-
-```mermaid
-flowchart TB
-    accTitle: Uploading a PDF to Seetonic
-    accDescr: POST /upload validates the PDF, then renders and embeds every page before writing anything. Cloud Storage holds the source PDF and page images; BigQuery holds one embedding per page. The response includes a document ID for later questions.
-
-    pdf(["PDF"]) --> prepare["Validate PDF<br/>Render and embed pages"]
-    prepare --> gcs[("Cloud Storage<br/>PDF + page PNGs")]
-    prepare --> bq[("BigQuery<br/>page embeddings")]
-```
-
-### Ask a question
-
-`POST /ask` takes a question and its `doc_id`. Only the question text is sent to the routing models.
-Retrieval is restricted to that document; the diagram shows the default limit of three pages.
+Seetonic is one FastAPI service on Cloud Run. With the default configuration, the service, its files and its BigQuery
+tables are in `europe-north1`, and it calls two models: Gemini on Vertex AI and Jev on TypeSafe.
 
 ```mermaid
-flowchart TB
-    accTitle: Answering a question about an uploaded PDF
-    accDescr: Jev and Flash label the question. A Gemini safety block or an attack label from either model produces a fixed JSON refusal. Otherwise, Seetonic embeds the question and retrieves up to three pages from the specified document in BigQuery. Flash answers using their images. Quotes are checked against the PDF text; for pages without searchable text, usable model-estimated boxes are marked approximate. The JSON response includes the answer, retrieved pages and citations with statuses and boxes.
+flowchart LR
+    accTitle: Seetonic components
+    accDescr: The browser calls the FastAPI app on Cloud Run to upload PDFs, ask questions and load page images. The app, Cloud Storage and both BigQuery tables are in europe-north1. The app calls Gemini on Vertex AI through the eu endpoint and sends only the question text to Jev on TypeSafe, which names no EU region. Cloud Run reads the TypeSafe API key from Secret Manager.
 
-    question(["Question + document ID"]) --> route["Label question<br/>Jev + Flash"]
-    route -->|"Otherwise"| retrieve["Embed question<br/>Search this document<br/>BigQuery: up to 3 pages"]
-    route -->|"Blocked or attack"| fixed(["Fixed refusal<br/>(JSON)"])
-    retrieve --> generate["Flash: answer + citations<br/>from page images"]
-    generate --> verify["Check quotes in PDF text<br/>No text layer: approximate<br/>model boxes if usable"]
-    verify --> response(["JSON: answer, pages,<br/>citations + status + boxes"])
+    browser(["Browser"]) -->|"upload, ask, page images"| app
+    subgraph region["Google Cloud: europe-north1"]
+        app["FastAPI app<br/>Cloud Run"]
+        gcs[("Cloud Storage")]
+        pages[("BigQuery<br/>pages table")]
+        questions[("BigQuery<br/>questions table")]
+    end
+    secret["Secret Manager"] -.->|"TypeSafe API key"| app
+    app -->|"PDF, page PNGs, snippets"| gcs
+    app -->|"embeddings, vector search"| pages
+    app -->|"log each answer or refusal"| questions
+    app --->|"embed, label, answer"| gemini["Gemini on Vertex AI<br/>eu endpoint"]
+    app --->|"question text only"| jev["Jev on TypeSafe<br/>no EU region named"]
 ```
 
-Page images and the source PDF are read from Cloud Storage. Citations with usable boxes also get a cropped snippet
-saved there. Neither quote matching nor an approximate box establishes that the answer is correct.
+For module-level detail with links to the code, download [`docs/system-design.html`](docs/system-design.html) and
+open it in a browser.
 
 ### Pipeline details
 
