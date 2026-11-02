@@ -2,7 +2,7 @@
 # Enable the deploy APIs, create the Cloud Run service account and grant it its roles and access to the
 # typesafe-api-key secret, and create the bucket, the BigQuery dataset and its two tables. Create that secret by hand
 # first.
-# Safe to rerun: each step leaves an existing one as it is.
+# Safe to rerun: reuse existing resources and apply missing grants and columns.
 # Reads the project and storage settings of app/config.py, with the same defaults.
 set -euo pipefail
 

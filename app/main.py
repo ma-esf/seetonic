@@ -93,7 +93,7 @@ def ask(body: Question) -> dict:
             result = verify.verify_citation(page, citation, config.DPI)
             result["snippet_url"] = None
             if result["boxes"]:
-                # Only the first box: the first line of the first place where search_for found the quote.
+                # Use the first box for the snippet; the page view shows all boxes.
                 path = f"{body.doc_id}/snippets/{uuid.uuid4().hex}.png"
                 store.save_file(path, pdf.crop(pngs[citation.page], result["boxes"][0]))
                 result["snippet_url"] = f"/files/{path}"
