@@ -234,7 +234,6 @@ async function errorMessage(response) {
   return `Error ${response.status}: ${text.slice(0, 200)}`;
 }
 
-// POST and return the JSON reply. A failed request throws an Error whose message is ready to show.
 async function post(url, options) {
   let response;
   try {
@@ -314,7 +313,7 @@ $("#upload").onclick = async () => {
 /* ---------- 2. ask ---------- */
 const PILL = { verified: "green", approximate: "amber", unverified: "red" };
 
-// An empty question is sent too, and the server's rejection shows. Trimmed, so a question of only spaces is empty.
+// Let the server validate empty questions.
 $("#ask-form").onsubmit = async e => {
   e.preventDefault();
   const button = $("#ask");
@@ -349,7 +348,7 @@ function showAnswer(reply) {
   const answer = $("#answer");
   const parts = text.split("**");
   if (parts.length % 2 === 0) {
-    // An odd number of ** leaves one without a partner, which would swap bold and plain: show the answer as it came.
+    // If bold markers are unmatched, display the normalized text without bold formatting.
     answer.textContent = text;
   } else {
     // The part between each pair of ** goes in a <strong>. Every part goes in as text.
@@ -377,7 +376,7 @@ function showAnswer(reply) {
   $("#steps").replaceChildren(...steps(reply).map(({ name, value, note, ok }, i) => {
     const step = el("li");
     const text = el("span");
-    text.append(...value);  // strings become text nodes
+    text.append(...value);
     step.append(el("span", "step-num", String(i + 1)), el("span", "k", name), text, el("span", ok ? "note ok" : "note", note));
     return step;
   }));
@@ -462,7 +461,6 @@ function closePanel() {
   document.querySelectorAll("#citations .flag.on").forEach(card => card.classList.remove("on"));
 }
 
-// The boxes are in percent of the paper, so a new paper width needs no redraw.
 function zoom(step) {
   state.zoom = step === 0 ? 1 : Math.min(2.5, Math.max(0.5, state.zoom + step * 0.25));
   $("#zoom-pc").textContent = Math.round(state.zoom * 100) + "%";
