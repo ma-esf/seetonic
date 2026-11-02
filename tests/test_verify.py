@@ -4,12 +4,12 @@ import pytest
 from app.gemini import Citation
 from app.verify import verify_citation
 
-# 144 DPI, the default in app/config.py: 2 pixels per point.
+# 2 pixels per point: _line_boxes and the expected boxes below assume this scale.
 DPI = 144
 
 
 def _text_page(text: str) -> pymupdf.Page:
-    """A US-letter page, which is not square, with the text from x = 72 points and the first baseline at 112."""
+    """A US-letter page (not square, so swapped x and y would fail), text from x = 72 points, first baseline at 112."""
     page = pymupdf.open().new_page(width=612, height=792)
     page.insert_text((72, 112), text)
     return page

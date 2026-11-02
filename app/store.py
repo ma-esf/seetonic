@@ -24,7 +24,7 @@ ORDER BY distance
 
 
 def save_file(path: str, data: bytes) -> None:
-    # Without a content type the client stores text/plain, and a browser would show a PNG as text.
+    # upload_from_string would otherwise label every object text/plain.
     bucket.blob(path).upload_from_string(data, content_type=mimetypes.guess_type(path)[0])
 
 
@@ -42,11 +42,10 @@ def insert_pages(rows: list[dict]) -> None:
 
 
 def log_question(row: dict) -> None:
-    # A streaming insert, not a load job: one row per question would soon use up the daily load-job quota.
-    # Give up within about 10 s: retries stop at 5 s, and the last attempt can run 5 s more. The default retry
-    # runs for 600 s, past Cloud Run's 300 s request timeout, so a slow BigQuery would cost the user the answer.
-    # It reports a rejected row by returning it, not by raising, so raise here.
+    # A streaming insert: a load job per question would use up the daily load-job quota. The 5 s retry deadline
+    # plus the 5 s request timeout cap this near 10 s; the default retry runs 600 s, past Cloud Run's 300 s timeout.
     errors = bq.insert_rows_json(QUESTIONS_TABLE, [row], retry=bigquery.DEFAULT_RETRY.with_timeout(5), timeout=5)
+    # Row-level insertion errors are returned rather than raised; API and transport failures can still raise.
     if errors:
         raise RuntimeError(f"BigQuery rejected the question row: {errors}")
 

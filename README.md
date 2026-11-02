@@ -145,6 +145,10 @@ and a TypeSafe API key. There is no local-only mode: a locally running server st
 Gemini and Jev. `setup.sh` provisions resources in an existing Google Cloud project, and `deploy.sh` deploys the
 service to Cloud Run. Settings are read from environment variables in `app/config.py`.
 
+The deployment keeps at least one Cloud Run instance running to reduce cold-start latency and scales up to two
+instances. Each instance handles one request at a time because PyMuPDF does not support concurrent use from multiple
+threads.
+
 ## Usage
 
 Use the [live service](https://seetonic-v77e2oesjq-lz.a.run.app), or run the server locally using cloud resources

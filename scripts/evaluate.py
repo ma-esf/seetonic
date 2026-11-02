@@ -18,7 +18,7 @@ import pymupdf
 
 ROOT = Path(__file__).resolve().parent.parent  # the PDF paths in the labeled set are relative to the repo root
 QUESTIONS = ROOT / "eval" / "questions.jsonl"
-RETRIES = 3  # with WAIT_SECONDS, outlasts a busy model (a Vertex 429), which clears within minutes
+RETRIES = 3  # with WAIT_SECONDS, waits up to 3 minutes for a busy model (a Vertex 429)
 WAIT_SECONDS = 60
 TOP_K = 3  # the metrics are @3, so the server must keep its default TOP_K
 
@@ -55,8 +55,11 @@ def verification_rate(statuses: list[str]) -> float:
 
 
 def _post(client: httpx.Client, path: str, **kwargs) -> dict:
-    """POST and return the JSON reply. A 502 or a timeout, as when the model is busy, is retried RETRIES times; any other
-    failure stops the run."""
+    """POST and return the JSON reply. A 502 or a timeout is retried RETRIES times; any other failure stops the run.
+
+    A 502 is a Gemini or Jev failure, or a model reply that did not fit its format, so such an answer is asked again
+    and never counted.
+    """
     for attempt in range(1 + RETRIES):
         if attempt:
             time.sleep(WAIT_SECONDS)
