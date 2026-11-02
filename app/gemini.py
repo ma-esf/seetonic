@@ -14,9 +14,10 @@ client = genai.Client(
 )
 
 INSTRUCTION = (
-    "Answer the question using only the page images. If the pages do not hold the answer, say so and give no "
-    'citations. Each image follows a label "Page N"; cite that N as the page. For each claim, copy the exact words '
-    "from the page as the quote, "
+    "Answer the question using only the page images. If nothing on the pages relates to the question, say so and "
+    "give no citations. If the question is loosely worded, answer its most likely meaning from the pages. Each "
+    'image follows a label "Page N"; cite that N as the page. For each claim, copy the exact words from the page as '
+    "the quote, "
     "as one continuous run of text in the order the page reads, with nothing left out; from a table, quote one cell "
     "per citation, never text joined from several cells, and prefer the numbers a claim rests on, without the $. "
     "Every claim in the answer, each list item included, needs its own citation. Give each citation a short label "
