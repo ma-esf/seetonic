@@ -23,11 +23,12 @@ MAX_PAGES="${MAX_PAGES:-50}"
 
 # Who may call the service is set in IAM, not here, so a redeploy keeps it open or closed. --concurrency 1 keeps
 # PyMuPDF, which does not support threads, on one request per instance, and with --max-instances 2 it caps the
-# service at two requests at once, which caps the rate of model calls.
+# service at two requests at once, which caps the rate of model calls. --min-instances 1 keeps one instance running,
+# so the first request after a quiet spell skips the 7-8 s start.
 gcloud run deploy seetonic --source . --quiet \
   --project "$PROJECT" --region "$REGION" \
   --service-account "seetonic-run@$PROJECT.iam.gserviceaccount.com" \
-  --min-instances 0 --max-instances 2 --concurrency 1 \
+  --min-instances 1 --max-instances 2 --concurrency 1 \
   --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT,GOOGLE_CLOUD_LOCATION=$LOCATION,\
 EMBEDDING_MODEL=$EMBEDDING_MODEL,FLASH_MODEL=$FLASH_MODEL,JEV_MODEL=$JEV_MODEL,DPI=$DPI,TOP_K=$TOP_K,\
 EMBEDDING_SIZE=$EMBEDDING_SIZE,DATA_LOCATION=$DATA_LOCATION,BUCKET=$BUCKET,DATASET=$DATASET,\
