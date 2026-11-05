@@ -35,8 +35,11 @@ ROUTER_INSTRUCTION = (
 )
 
 
+RouteLabel = Literal["answer", "clarify", "off_topic", "attack"]
+
+
 class Route(BaseModel):
-    label: Literal["answer", "clarify", "off_topic", "attack"]
+    label: RouteLabel
 
 
 class Citation(BaseModel):
@@ -51,12 +54,14 @@ class ModelAnswer(BaseModel):
     citations: list[Citation]
 
 
-def _embed(content: types.PartUnion) -> list[float]:
+def _embed(content: str | types.Part) -> list[float]:
     response = client.models.embed_content(
         model=config.EMBEDDING_MODEL,
         contents=content,
         config=types.EmbedContentConfig(output_dimensionality=config.EMBEDDING_SIZE),
     )
+    if not response.embeddings or response.embeddings[0].values is None:
+        raise ValueError("Embedding response did not contain embedding values")
     return response.embeddings[0].values
 
 
@@ -68,9 +73,9 @@ def embed_text(text: str) -> list[float]:
     return _embed(text)
 
 
-def route_question(question: str) -> str:
-    """Label the question from its text alone, or "blocked" when the safety filter blocked the question; raises if the
-    reply does not fit Route."""
+def route_question(question: str) -> RouteLabel | Literal["blocked"]:
+    """Return the question's label, judged from its text alone, or "blocked" when the safety filter blocked it; raises
+    ValidationError if the reply is empty or does not fit Route."""
     response = client.models.generate_content(
         model=config.FLASH_MODEL,
         contents=question,
@@ -82,11 +87,12 @@ def route_question(question: str) -> str:
     )
     if response.prompt_feedback and response.prompt_feedback.block_reason:
         return "blocked"
-    return Route.model_validate_json(response.text).label
+    return Route.model_validate_json(response.text or "").label
 
 
 def ask_model(question: str, pages: list[tuple[int, bytes]]) -> ModelAnswer:
-    """Send each page image after a "Page N" label; raises if the reply does not fit ModelAnswer."""
+    """Answer the question from the page images, each sent after a "Page N" label the model cites; raises
+    ValidationError if the reply is empty or does not fit ModelAnswer."""
     contents = []
     for page_number, png in pages:
         contents += [f"Page {page_number}", types.Part.from_bytes(data=png, mime_type="image/png")]
@@ -99,4 +105,4 @@ def ask_model(question: str, pages: list[tuple[int, bytes]]) -> ModelAnswer:
             response_schema=ModelAnswer,
         ),
     )
-    return ModelAnswer.model_validate_json(response.text)
+    return ModelAnswer.model_validate_json(response.text or "")

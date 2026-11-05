@@ -117,5 +117,5 @@ def test_ask_returns_502_and_logs_nothing_when_jev_fails(logged, monkeypatch):
     monkeypatch.setattr(jev, "label_question", timed_out)
     response = TestClient(app).post("/ask", json={"doc_id": "d1", "question": "What is the invoice total?"})
     assert response.status_code == 502
-    assert response.json() == {"detail": "The model is unavailable. Ask again."}
+    assert response.json() == {"detail": "The model gave no usable reply. Ask again."}
     assert logged == []
