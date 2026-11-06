@@ -22,7 +22,7 @@
         "id": "ask",
         "label": "Ask a question",
         "focus": ["ui", "main", "jev", "typesafe", "gemini", "vertex", "store", "bq_pages", "gcs", "verify", "pdf", "bq_questions"],
-        "note": "Label the question, search the top 3 pages, Flash answers from their images, PyMuPDF checks quotes, row logged."
+        "note": "Label the question, search the top 3 pages, Flash answers from their images, PyMuPDF checks quotes, a second Flash call checks any it cannot place, row logged."
       },
       {
         "id": "refusal",
@@ -79,12 +79,13 @@
       ]
     },
     {
-      "id": "gemini", "type": "backend", "label": "gemini.py", "sublabel": "embed · route · answer",
+      "id": "gemini", "type": "backend", "label": "gemini.py", "sublabel": "embed · route · answer · check",
       "pos": [770, 220], "size": [150, 60],
       "sources": [
-        { "path": "app/gemini.py", "line": 47, "end_line": 63, "label": "embed page image or question" },
-        { "path": "app/gemini.py", "line": 66, "end_line": 80, "label": "route_question: label or blocked" },
-        { "path": "app/gemini.py", "line": 83, "end_line": 98, "label": "ask_model: answer + citations" }
+        { "path": "app/gemini.py", "line": 63, "end_line": 79, "label": "embed page image or question" },
+        { "path": "app/gemini.py", "line": 82, "end_line": 96, "label": "route_question: label or blocked" },
+        { "path": "app/gemini.py", "line": 99, "end_line": 114, "label": "ask_model: answer + citations" },
+        { "path": "app/gemini.py", "line": 117, "end_line": 131, "label": "find_quote: second look at one page" }
       ]
     },
     {
@@ -100,9 +101,9 @@
       "id": "main", "type": "backend", "label": "FastAPI app · main.py", "sublabel": "POST /upload · POST /ask · GET /files · static UI",
       "pos": [350, 360], "size": [570, 64],
       "sources": [
-        { "path": "app/main.py", "line": 27, "end_line": 49, "label": "POST /upload" },
-        { "path": "app/main.py", "line": 52, "end_line": 95, "label": "POST /ask" },
-        { "path": "app/main.py", "line": 120, "end_line": 133, "label": "GET /files and the static mount" }
+        { "path": "app/main.py", "line": 29, "end_line": 51, "label": "POST /upload" },
+        { "path": "app/main.py", "line": 54, "end_line": 102, "label": "POST /ask" },
+        { "path": "app/main.py", "line": 141, "end_line": 154, "label": "GET /files and the static mount" }
       ]
     },
     {
@@ -142,8 +143,10 @@
       "id": "verify", "type": "backend", "label": "verify.py", "sublabel": "quote → status + boxes",
       "pos": [770, 500], "size": [150, 60],
       "sources": [
-        { "path": "app/verify.py", "line": 25, "end_line": 65, "label": "verify_citation" },
-        { "path": "app/main.py", "line": 88, "end_line": 92, "label": "called per citation" }
+        { "path": "app/verify.py", "line": 25, "end_line": 59, "label": "verify_citation" },
+        { "path": "app/verify.py", "line": 62, "end_line": 71, "label": "with_model_box: model box to pixels" },
+        { "path": "app/main.py", "line": 90, "end_line": 99, "label": "called per citation" },
+        { "path": "app/main.py", "line": 105, "end_line": 116, "label": "check_with_gemini: unplaced quotes" }
       ]
     },
     {
@@ -151,7 +154,7 @@
       "pos": [350, 650], "size": [150, 60],
       "sources": [
         { "path": "setup.sh", "line": 42, "end_line": 46, "label": "bucket in DATA_LOCATION" },
-        { "path": "app/main.py", "line": 45, "end_line": 47, "label": "source.pdf and pages/N.png" }
+        { "path": "app/main.py", "line": 47, "end_line": 49, "label": "source.pdf and pages/N.png" }
       ]
     },
     {
@@ -169,7 +172,7 @@
       "sources": [
         { "path": "setup.sh", "line": 53, "end_line": 57, "label": "questions table" },
         { "path": "app/store.py", "line": 44, "end_line": 50, "label": "streaming insert, 5 s cap" },
-        { "path": "app/main.py", "line": 98, "end_line": 117, "label": "log row; failure goes to stderr" }
+        { "path": "app/main.py", "line": 119, "end_line": 138, "label": "log row; failure goes to stderr" }
       ]
     }
   ],
@@ -199,7 +202,7 @@
     { "id": "ui-main", "from": "ui", "to": "main", "label": "upload · ask · files", "variant": "emphasis" },
     { "id": "scripts-main", "from": "scripts", "to": "main", "label": "HTTPS" },
     { "id": "main-jev", "from": "main", "to": "jev", "label": "label question" },
-    { "id": "main-gemini", "from": "main", "to": "gemini", "label": "embed · route · answer", "variant": "emphasis" },
+    { "id": "main-gemini", "from": "main", "to": "gemini", "label": "embed · route · answer · check", "variant": "emphasis" },
     { "id": "jev-typesafe", "from": "jev", "to": "typesafe", "label": "question text", "variant": "security" },
     { "id": "gemini-vertex", "from": "gemini", "to": "vertex", "label": "page images, question" },
     { "id": "secrets-jev", "from": "secrets", "to": "jev", "label": "API key (env)", "variant": "security" },

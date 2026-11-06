@@ -8,7 +8,8 @@ answer. Flash is instructed to cite each claim with a page number, quote and sho
 
 PyMuPDF checks quoted text against the cited page's text layer and highlights matching regions. This checks quote
 presence, not whether the evidence supports the answer. For pages without a searchable text layer, usable
-model-estimated bounding boxes are marked `approximate`.
+model-estimated bounding boxes are marked `approximate`. If neither places a quote, a second Gemini call looks for
+it on the page image; a quote that call finds is also marked `approximate`.
 
 Jev (TypeSafe) and Gemini Flash label each question before retrieval. Every question is answered, unless Gemini's
 safety filter blocks it or either model labels it an attack: then it receives a fixed refusal instead.
@@ -49,7 +50,7 @@ flowchart LR
     app -->|"PDF, page PNGs"| gcs
     app -->|"embeddings, vector search"| pages
     app -->|"log each answer or refusal"| questions
-    app --->|"embed, label, answer"| gemini["Gemini on Vertex AI<br/>eu endpoint"]
+    app --->|"embed, label, answer, check quotes"| gemini["Gemini on Vertex AI<br/>eu endpoint"]
     app --->|"question text only"| jev["Jev on TypeSafe<br/>no EU region named"]
 ```
 
@@ -74,7 +75,9 @@ The pipeline, using the default configuration:
    that it may see only some pages, so it does not present a list as complete. The page shows which pages were read
    and that the answer may leave out content from the other pages.
 5. **Verify.** PyMuPDF searches for each quote on its cited page. Matching regions are mapped to bounding boxes in
-   page-image pixels.
+   page-image pixels. A quote still `unverified` on a retrieved
+   page goes to a second Flash call, shown only that page image and asked whether the exact quote is on it. When it
+   says yes, its box is kept and the citation is marked `approximate`.
 6. **Log.** For each request that returns an answer or fixed response, the service attempts to log the question,
    retrieved pages, citation statuses, latency and routing outputs to BigQuery. Requests ending in an HTTP 404 or 502
    response are not logged. Logging failures are reported without failing the request.
@@ -84,8 +87,8 @@ Citation statuses:
 | Status | Meaning |
 |---|---|
 | `verified` | The quote matched the cited page's text layer, with word and number boundary checks. Bounding boxes come from the PDF. |
-| `approximate` | The page has no searchable text layer, so a model-estimated bounding box is shown. The quote has not been text-verified. |
-| `unverified` | A text-layer search failed, the cited page was not retrieved, or a page without searchable text has no usable model-estimated box after clipping to the page boundaries. No highlight is shown. |
+| `approximate` | A model-estimated bounding box is shown; the quote has not been text-verified. The box is the answer's on a page with no searchable text layer, or the second call's when it finds a quote nothing else placed. |
+| `unverified` | The cited page was not retrieved, or neither the text-layer search nor a usable model-estimated box (after clipping to the page boundaries) placed the quote and the second call did not find it either. No highlight is shown. |
 
 Verification checks whether the quoted text can be matched on the cited page. It does not check whether the quote
 supports the answer or whether the citation's label is correct.
@@ -229,7 +232,7 @@ curl -H 'Content-Type: application/json' \
 |---|---|
 | `answer` | The generated answer, or a fixed refusal. |
 | `pages` | Retrieved pages with cosine similarity, best first. Empty when refused. |
-| `citations[].status` | See [How it works](#how-it-works). Set by `verify.verify_citation`, not the model. |
+| `citations[].status` | See [How it works](#how-it-works). Set by `verify.verify_citation` and `main.check_with_gemini`, not the answer model. |
 | `citations[].boxes` | Bounding boxes as `[x0, y0, x1, y1]` in page-image pixels at `DPI`, with the origin at the top left. One per matched text line, or a model-estimated box for `approximate` citations. Empty when `unverified`. |
 | `decision` | `answer`, or the reason for a refusal: `blocked` or `attack`. |
 | `route` | Flash's classification, or `blocked` if Gemini's safety filter blocked the question. |
@@ -239,7 +242,8 @@ For answered questions, returns HTTP 404 if no pages are stored for `doc_id`. Re
 checking whether the document exists.
 
 Returns HTTP 502 when a Gemini or Jev call fails or times out, or a model response does not match the required
-schema. A request that returns 502 can be retried.
+schema. A failed quote check is the exception: it only leaves that citation `unverified`. A request that returns
+502 can be retried.
 
 ### `GET /files/{path}`
 

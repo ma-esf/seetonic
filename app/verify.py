@@ -38,14 +38,8 @@ def verify_citation(page: pymupdf.Page | None, citation: Citation, dpi: int) -> 
     # ligature such as U+FB01 split into its letters.
     text = page.get_text(flags=pymupdf.TEXTFLAGS_SEARCH)
     if not text.strip():
-        # A scan has no text to search, so keep the model's box: [ymin, xmin, ymax, xmax] on a 0-1000 scale.
-        ymin, xmin, ymax, xmax = citation.box_2d
-        width, height = page.rect.width * scale, page.rect.height * scale
-        box = pymupdf.Rect(xmin * width / 1000, ymin * height / 1000, xmax * width / 1000, ymax * height / 1000)
-        box &= pymupdf.Rect(0, 0, width, height)  # keep only the part on the page image
-        if box.is_empty:  # zero size, min after max, or off the page: no place to show
-            return result
-        return {**result, "status": "approximate", "boxes": [list(box)]}
+        # A scan has no text to search, so keep the model's box.
+        return with_model_box(result, page, citation.box_2d, dpi)
     # Every run of whitespace, Unicode spaces included, becomes one plain space, in the quote and in the page text.
     quote = " ".join(citation.quote.split())
     # search_for also matches inside a longer word or number, so check the quote stands alone at least once. The
@@ -63,3 +57,15 @@ def verify_citation(page: pymupdf.Page | None, citation: Citation, dpi: int) -> 
     if boxes:
         return {**result, "status": "verified", "boxes": boxes}
     return result
+
+
+def with_model_box(result: dict, page: pymupdf.Page, box_2d: list[int], dpi: int) -> dict:
+    """Mark the result approximate with a model's box, [ymin, xmin, ymax, xmax] on a 0-1000 scale, in page-image
+    pixels; return it unchanged when no part of the box is on the page image."""
+    ymin, xmin, ymax, xmax = box_2d
+    width, height = page.rect.width * dpi / 72, page.rect.height * dpi / 72
+    box = pymupdf.Rect(xmin * width / 1000, ymin * height / 1000, xmax * width / 1000, ymax * height / 1000)
+    box &= pymupdf.Rect(0, 0, width, height)  # keep only the part on the page image
+    if box.is_empty:  # zero size, min after max, or off the page: no place to show
+        return result
+    return {**result, "status": "approximate", "boxes": [list(box)]}
