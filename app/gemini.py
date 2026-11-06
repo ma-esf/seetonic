@@ -25,8 +25,8 @@ INSTRUCTION = (
     "as [ymin, xmin, ymax, xmax] on a 0-1000 scale."
 )
 
-CHECK_TIMEOUT_MS = 30_000  # the slowest of 87 checks in the 2026-11-06 eval took 19.6 s
-# Worded as in the 2026-11-06 run that chose this check; rewording it means running that eval again.
+CHECK_TIMEOUT_MS = 30_000  # checks take 3-5 s, rarely up to 20 s
+# The eval that chose this check used this wording; rewording it means running the eval again.
 CHECK_INSTRUCTION = (
     "You check whether a quote appears on a page image. Set present to true only if the exact text appears on the "
     "page, character for character: a different digit, a missing or extra digit, or a number that only looks similar "
