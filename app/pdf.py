@@ -27,6 +27,15 @@ def render_page(pdf_bytes: bytes, page_number: int, dpi: int) -> bytes:
         return doc[page_number - 1].get_pixmap(dpi=dpi).tobytes("png")
 
 
+def shrink_to_fit(png: bytes, longest: int) -> bytes:
+    """Scale a PNG down, keeping its shape, so its longest side is at most `longest` pixels; a smaller one is kept."""
+    image = pymupdf.Pixmap(png)
+    scale = longest / max(image.width, image.height)
+    if scale >= 1:
+        return png
+    return pymupdf.Pixmap(image, round(image.width * scale), round(image.height * scale), None).tobytes("png")
+
+
 def crop(png: bytes, box: list[float]) -> bytes:
     """Cut a box [x0, y0, x1, y1], in pixels, out of a PNG, rounding outwards.
 

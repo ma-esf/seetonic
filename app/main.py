@@ -52,8 +52,8 @@ def upload(file: UploadFile) -> dict:
 @app.post("/ask")
 def ask(body: Question) -> dict:
     """Answer from the document's top pages, unless Flash blocks the question or either model labels it "attack": then
-    give a fixed reply. Both labels are logged and returned either way. Code, not the model, decides each citation's
-    status and boxes."""
+    give a fixed reply. Both labels are logged and returned either way. Code, not the answer model, decides each
+    citation's status and boxes; a quote that code cannot place can only become approximate, on Jev's word."""
     start = time.perf_counter()
     try:
         jev_label = jev.label_question(body.question)
@@ -90,6 +90,8 @@ def ask(body: Question) -> dict:
         for citation in reply.citations:
             page = doc[citation.page - 1] if citation.page in pngs else None
             result = verify.verify_citation(page, citation, config.DPI)
+            if result["status"] == "unverified" and page is not None and citation.quote.strip():
+                result = locate_with_jev(result, pngs[citation.page])
             result["snippet_url"] = None
             if result["boxes"]:
                 # Use the first box for the snippet; the page view shows all boxes.
@@ -100,6 +102,26 @@ def ask(body: Question) -> dict:
     pages = [{"page": page, "score": score} for page, score in scored]
     log_question(body, start, flash_label, jev_label, pages, [citation["status"] for citation in citations])
     return {"answer": reply.answer, "pages": pages, "citations": citations, **labels}
+
+
+def locate_with_jev(result: dict, png: bytes) -> dict:
+    """Make an unverified citation approximate, with Jev's box in page-image pixels, when Jev sees the quote on the page
+    image. The quote may be in a picture, behind garbled fonts, or on a scan whose Gemini box was unusable."""
+    try:
+        edges = jev.find_quote(png, result["quote"])
+    except (httpx.HTTPError, ValidationError) as error:
+        # The citation stays unverified: a failed second look must not cost the user the answer.
+        print(f"Jev could not look for the quote: {error!r}", file=sys.stderr)
+        return result
+    if edges is None:
+        return result
+    image = pymupdf.Pixmap(png)
+    width, height = image.width, image.height
+    box = pymupdf.Rect(edges.left * width, edges.top * height, edges.right * width, edges.bottom * height)
+    box &= pymupdf.Rect(0, 0, width, height)
+    if box.is_empty:  # pdf.crop cannot cut a snippet from a box with no area
+        return result
+    return {**result, "status": "approximate", "boxes": [list(box)]}
 
 
 def log_question(

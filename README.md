@@ -8,7 +8,9 @@ answer. Flash is instructed to cite each claim with a page number, quote and sho
 
 PyMuPDF checks quoted text against the cited page's text layer and highlights matching regions. This checks quote
 presence, not whether the evidence supports the answer. For pages without a searchable text layer, usable
-model-estimated bounding boxes are marked `approximate`.
+model-estimated bounding boxes are marked `approximate`. A quote that neither the text layer nor Gemini's box places,
+such as a number inside a table image, is shown to Jev (TypeSafe) on the page image; if Jev sees it, Jev's box is shown
+and it is marked `approximate`.
 
 Jev (TypeSafe) and Gemini Flash label each question before retrieval. Every question is answered, unless Gemini's
 safety filter blocks it or either model labels it an attack: then it receives a fixed refusal instead.
@@ -36,7 +38,7 @@ tables are in `europe-north1`, and it calls two models: Gemini on Vertex AI and 
 ```mermaid
 flowchart LR
     accTitle: Seetonic components
-    accDescr: The browser calls the FastAPI app on Cloud Run to upload PDFs, ask questions and load page images. The app, Cloud Storage and both BigQuery tables are in europe-north1. The app calls Gemini on Vertex AI through the eu endpoint and sends only the question text to Jev on TypeSafe, which names no EU region. Cloud Run reads the TypeSafe API key from Secret Manager.
+    accDescr: The browser calls the FastAPI app on Cloud Run to upload PDFs, ask questions and load page images. The app, Cloud Storage and both BigQuery tables are in europe-north1. The app calls Gemini on Vertex AI through the eu endpoint and sends the question text, and the page image of any quote it cannot otherwise place, to Jev on TypeSafe, which names no EU region. Cloud Run reads the TypeSafe API key from Secret Manager.
 
     browser(["Browser"]) -->|"upload, ask, page images"| app
     subgraph region["Google Cloud: europe-north1"]
@@ -50,7 +52,7 @@ flowchart LR
     app -->|"embeddings, vector search"| pages
     app -->|"log each answer or refusal"| questions
     app --->|"embed, label, answer"| gemini["Gemini on Vertex AI<br/>eu endpoint"]
-    app --->|"question text only"| jev["Jev on TypeSafe<br/>no EU region named"]
+    app --->|"question text, page images of unfound quotes"| jev["Jev on TypeSafe<br/>no EU region named"]
 ```
 
 For module-level detail with links to the code, download [`docs/system-design.html`](docs/system-design.html) and
@@ -72,7 +74,11 @@ The pipeline, using the default configuration:
    smallest cosine distance. The search is exact over the document's page embeddings; it does not use a vector index.
 4. **Answer.** Flash receives the retrieved page images and returns an answer and citations as JSON.
 5. **Verify.** PyMuPDF searches for each quote on its cited page. Matching regions are mapped to bounding boxes in
-   page-image pixels, and the first box is cropped to produce a snippet.
+   page-image pixels, and the first box is cropped to produce a snippet. When a quote on a retrieved page is still
+   `unverified` (the search found nothing, or a page with no text layer has no usable Gemini box), `jev-1.14.0` gets
+   the page image, scaled to at most 1568 pixels a side, and is asked whether the quote is on it
+   and where. Its box is kept only when both answers score at least 0.5; a failed Jev call leaves the citation
+   `unverified`.
 6. **Log.** For each request that returns an answer or fixed response, the service attempts to log the question,
    retrieved pages, citation statuses, latency and routing outputs to BigQuery. Requests ending in an HTTP 404 or 502
    response are not logged. Logging failures are reported without failing the request.
@@ -82,8 +88,8 @@ Citation statuses:
 | Status | Meaning |
 |---|---|
 | `verified` | The quote matched the cited page's text layer, with word and number boundary checks. Bounding boxes come from the PDF. |
-| `approximate` | The page has no searchable text layer, so a model-estimated bounding box is shown. The quote has not been text-verified. |
-| `unverified` | A text-layer search failed, the cited page was not retrieved, or a page without searchable text has no usable model-estimated box after clipping to the page boundaries. No highlight is shown. |
+| `approximate` | A model-estimated bounding box is shown and the quote has not been text-verified: Gemini's box when the page has no searchable text layer, or Jev's box when neither the text layer nor Gemini's box placed the quote but Jev sees it on the page image. |
+| `unverified` | The cited page was not retrieved, or neither the text-layer search nor a usable Gemini box (clipped to the page boundaries) placed the quote and Jev did not see it either. No highlight is shown. |
 
 Verification checks whether the quoted text can be matched on the cited page. It does not check whether the quote
 supports the answer or whether the citation's label is correct.
@@ -92,8 +98,9 @@ Stack: FastAPI, PyMuPDF, Gemini on Vertex AI, Jev on TypeSafe, Cloud Storage, Bi
 one static HTML file with no build step.
 
 By default, Cloud Storage and BigQuery use `europe-north1`, and Gemini requests use the `eu` endpoint. Question text
-is also sent to Jev through TypeSafe; this configuration does not establish where TypeSafe processes it. The service
-does not send uploaded page images or extracted page text to Jev.
+is also sent to Jev through TypeSafe; this configuration does not establish where TypeSafe processes it. So is the page
+image of any cited quote that neither the text layer nor Gemini's box places; extracted page text is never sent to Jev. TypeSafe labels image
+and box questions not yet production-ready and may change their format between releases.
 
 ## Evaluation
 
@@ -227,8 +234,8 @@ curl -H 'Content-Type: application/json' \
 |---|---|
 | `answer` | The generated answer, or a fixed refusal. |
 | `pages` | Retrieved pages with cosine similarity, best first. Empty when refused. |
-| `citations[].status` | See [How it works](#how-it-works). Set by `verify.verify_citation`, not the model. |
-| `citations[].boxes` | Bounding boxes as `[x0, y0, x1, y1]` in page-image pixels at `DPI`, with the origin at the top left. One per matched text line, or a model-estimated box for `approximate` citations. Empty when `unverified`. |
+| `citations[].status` | See [How it works](#how-it-works). Set by `verify.verify_citation`, or by `main.locate_with_jev` from Jev's answers, not by the answer model. |
+| `citations[].boxes` | Bounding boxes as `[x0, y0, x1, y1]` in page-image pixels at `DPI`, with the origin at the top left. One per matched text line, or one model-estimated box (Gemini's or Jev's) for `approximate` citations. Empty when `unverified`. |
 | `citations[].snippet_url` | A crop of the first box, or `null`. |
 | `decision` | `answer`, or the reason for a refusal: `blocked` or `attack`. |
 | `route` | Flash's classification, or `blocked` if Gemini's safety filter blocked the question. |
@@ -238,7 +245,8 @@ For answered questions, returns HTTP 404 if no pages are stored for `doc_id`. Re
 checking whether the document exists.
 
 Returns HTTP 502 when a Gemini or Jev call fails or times out, or a model response does not match the required
-schema. A request that returns 502 can be retried.
+schema. A request that returns 502 can be retried. A failed Jev call while looking for a quote does not fail the
+request: that citation stays `unverified`.
 
 ### `GET /files/{path}`
 

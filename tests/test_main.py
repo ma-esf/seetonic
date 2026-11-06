@@ -1,4 +1,5 @@
 import httpx
+import pymupdf
 import pytest
 from fastapi.testclient import TestClient
 
@@ -24,7 +25,54 @@ def logged(monkeypatch) -> list[dict]:
     monkeypatch.setattr(store, "load_file", lambda path: source if path.endswith(".pdf") else png)
     monkeypatch.setattr(store, "save_file", lambda path, data: None)
     monkeypatch.setattr(store, "log_question", rows.append)
+    monkeypatch.setattr(jev, "find_quote", _never)
     return rows
+
+
+def _never(*args):
+    raise AssertionError("Jev was asked about a quote")
+
+
+def _ask_about(monkeypatch, quote: str, page: int = 1) -> dict:
+    """Have the answer model cite the quote on the page, then ask; returns the one citation in the reply."""
+    citation = Citation(page=page, quote=quote, label="Invoice total", box_2d=[0, 0, 0, 0])
+    monkeypatch.setattr(gemini, "ask_model", lambda question, pages: ModelAnswer(answer="9 999.", citations=[citation]))
+    response = TestClient(app).post("/ask", json={"doc_id": "d1", "question": "What is the invoice total?"})
+    assert response.status_code == 200
+    [result] = response.json()["citations"]
+    return result
+
+
+def test_a_quote_the_text_layer_lacks_is_approximate_with_jev_box_in_page_image_pixels(logged, monkeypatch):
+    monkeypatch.setattr(jev, "find_quote", lambda png, quote: jev.Edges(left=0.1, top=0.2, right=0.5, bottom=0.25))
+    result = _ask_about(monkeypatch, "9 999 euros")
+    image = pymupdf.Pixmap(pdf.render_page(one_page_pdf(), 1, config.DPI))
+    assert result["status"] == "approximate"
+    assert result["boxes"] == [pytest.approx([0.1 * image.width, 0.2 * image.height, 0.5 * image.width,
+                                              0.25 * image.height])]
+    assert result["snippet_url"].startswith("/files/d1/snippets/")
+    assert logged[0]["statuses"] == ["approximate"]
+
+
+def test_a_quote_jev_does_not_see_stays_unverified(logged, monkeypatch):
+    monkeypatch.setattr(jev, "find_quote", lambda png, quote: None)
+    result = _ask_about(monkeypatch, "9 999 euros")
+    assert (result["status"], result["boxes"], result["snippet_url"]) == ("unverified", [], None)
+
+
+def test_a_failed_jev_call_keeps_the_quote_unverified_and_the_answer(logged, monkeypatch, capsys):
+    def timed_out(png, quote):
+        raise httpx.ReadTimeout("timed out")
+
+    monkeypatch.setattr(jev, "find_quote", timed_out)
+    result = _ask_about(monkeypatch, "9 999 euros")
+    assert (result["status"], result["boxes"]) == ("unverified", [])
+    assert "timed out" in capsys.readouterr().err
+
+
+def test_jev_is_not_asked_about_a_page_that_was_not_retrieved(logged, monkeypatch):
+    # The fixture's find_quote fails the test if it is called.
+    assert _ask_about(monkeypatch, "9 999 euros", page=2)["status"] == "unverified"
 
 
 def test_ask_logs_one_row_with_the_pages_and_statuses_it_returns(logged):
