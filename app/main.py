@@ -17,6 +17,8 @@ from app import config, gemini, jev, pdf, store, verify
 app = FastAPI()
 
 REFUSAL = "This question cannot be answered."
+# Cloud Run ends a request at 300 s; a quote check may take gemini.CHECK_TIMEOUT_MS (30 s), then snippets and the log.
+CHECK_BY_S = 260
 
 
 class Question(BaseModel):
@@ -52,8 +54,8 @@ def upload(file: UploadFile) -> dict:
 @app.post("/ask")
 def ask(body: Question) -> dict:
     """Answer from the document's top pages, unless Flash blocks the question or either model labels it "attack": then
-    give a fixed reply. Both labels are logged and returned either way. Code, not the model, decides each citation's
-    status and boxes."""
+    give a fixed reply. Both labels are logged and returned either way. Code, not the answer model, decides each
+    citation's status and boxes; a quote that code cannot place can only become approximate, on a second call's word."""
     start = time.perf_counter()
     try:
         jev_label = jev.label_question(body.question)
@@ -90,6 +92,10 @@ def ask(body: Question) -> dict:
         for citation in reply.citations:
             page = doc[citation.page - 1] if citation.page in pngs else None
             result = verify.verify_citation(page, citation, config.DPI)
+            if result["status"] == "unverified" and page is not None and citation.quote.strip() and (
+                time.perf_counter() - start < CHECK_BY_S
+            ):
+                result = check_with_gemini(result, page, pngs[citation.page])
             result["snippet_url"] = None
             if result["boxes"]:
                 # Use the first box for the snippet; the page view shows all boxes.
@@ -100,6 +106,20 @@ def ask(body: Question) -> dict:
     pages = [{"page": page, "score": score} for page, score in scored]
     log_question(body, start, flash_label, jev_label, pages, [citation["status"] for citation in citations])
     return {"answer": reply.answer, "pages": pages, "citations": citations, **labels}
+
+
+def check_with_gemini(result: dict, page: pymupdf.Page, png: bytes) -> dict:
+    """Make an unverified citation approximate when a second Gemini call, shown only the page image, finds the quote.
+    The quote may be in a picture, behind garbled fonts, or on a scan whose answer box was unusable."""
+    try:
+        box_2d = gemini.find_quote(png, result["quote"])
+    except (APIError, ValidationError, httpx.HTTPError) as error:
+        # The citation stays unverified: a failed second look must not cost the user the answer.
+        print(f"The quote check failed: {error!r}", file=sys.stderr)
+        return result
+    if box_2d is None:
+        return result
+    return verify.with_model_box(result, page, box_2d, config.DPI)
 
 
 def log_question(

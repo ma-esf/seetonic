@@ -1,8 +1,9 @@
 import httpx
+import pymupdf
 import pytest
 from fastapi.testclient import TestClient
 
-from app import config, gemini, jev, pdf, store
+from app import config, gemini, jev, main, pdf, store
 from app.gemini import Citation, ModelAnswer
 from app.main import app
 from scripts.smoke import SENTENCE, one_page_pdf
@@ -24,7 +25,60 @@ def logged(monkeypatch) -> list[dict]:
     monkeypatch.setattr(store, "load_file", lambda path: source if path.endswith(".pdf") else png)
     monkeypatch.setattr(store, "save_file", lambda path, data: None)
     monkeypatch.setattr(store, "log_question", rows.append)
+    monkeypatch.setattr(gemini, "find_quote", _never)
     return rows
+
+
+def _never(*args):
+    raise AssertionError("the quote check ran")
+
+
+def _ask_about(monkeypatch, quote: str, page: int = 1) -> dict:
+    """Have the answer model cite the quote on the page, then ask; returns the one citation in the reply."""
+    citation = Citation(page=page, quote=quote, label="Invoice total", box_2d=[0, 0, 0, 0])
+    monkeypatch.setattr(gemini, "ask_model", lambda question, pages: ModelAnswer(answer="9 999.", citations=[citation]))
+    response = TestClient(app).post("/ask", json={"doc_id": "d1", "question": "What is the invoice total?"})
+    assert response.status_code == 200
+    [result] = response.json()["citations"]
+    return result
+
+
+def test_a_quote_the_text_layer_lacks_is_approximate_with_the_check_box_in_page_image_pixels(logged, monkeypatch):
+    monkeypatch.setattr(gemini, "find_quote", lambda png, quote: [200, 100, 250, 500])
+    result = _ask_about(monkeypatch, "9 999 euros")
+    page = pymupdf.open(stream=one_page_pdf())[0]
+    width, height = page.rect.width * config.DPI / 72, page.rect.height * config.DPI / 72
+    assert result["status"] == "approximate"
+    assert result["boxes"] == [pytest.approx([0.1 * width, 0.2 * height, 0.5 * width, 0.25 * height])]
+    assert result["snippet_url"].startswith("/files/d1/snippets/")
+    assert logged[0]["statuses"] == ["approximate"]
+
+
+@pytest.mark.parametrize("box_2d", [None, [0, 0, 0, 0]], ids=["not-seen", "box-with-no-area"])
+def test_a_quote_the_check_does_not_place_stays_unverified(logged, monkeypatch, box_2d):
+    monkeypatch.setattr(gemini, "find_quote", lambda png, quote: box_2d)
+    result = _ask_about(monkeypatch, "9 999 euros")
+    assert (result["status"], result["boxes"], result["snippet_url"]) == ("unverified", [], None)
+
+
+def test_a_failed_check_keeps_the_quote_unverified_and_the_answer(logged, monkeypatch, capsys):
+    def timed_out(png, quote):
+        raise httpx.ReadTimeout("timed out")
+
+    monkeypatch.setattr(gemini, "find_quote", timed_out)
+    result = _ask_about(monkeypatch, "9 999 euros")
+    assert (result["status"], result["boxes"]) == ("unverified", [])
+    assert "timed out" in capsys.readouterr().err
+
+
+def test_no_check_runs_for_a_page_that_was_not_retrieved(logged, monkeypatch):
+    # The fixture's find_quote fails the test if it is called.
+    assert _ask_about(monkeypatch, "9 999 euros", page=2)["status"] == "unverified"
+
+
+def test_no_check_starts_once_the_request_is_near_cloud_runs_timeout(logged, monkeypatch):
+    monkeypatch.setattr(main, "CHECK_BY_S", 0)
+    assert _ask_about(monkeypatch, "9 999 euros")["status"] == "unverified"
 
 
 def test_ask_logs_one_row_with_the_pages_and_statuses_it_returns(logged):
