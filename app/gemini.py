@@ -8,7 +8,7 @@ from app import config, routing
 
 # Set in code, so neither GOOGLE_GENAI_USE_VERTEXAI nor an API key in the environment
 # can move calls off Agent Platform. The timeout is in ms: 60 s per call keeps /ask's three Gemini calls inside
-# Cloud Run's 300 s request timeout.
+# Cloud Run's 300 s request timeout; find_quote sets its own, shorter one.
 client = genai.Client(
     vertexai=True, project=config.PROJECT, location=config.LOCATION, http_options=types.HttpOptions(timeout=60_000)
 )
@@ -23,6 +23,15 @@ INSTRUCTION = (
     "Every claim in the answer, each list item included, needs its own citation. Give each citation a short label "
     'that says what the quote is, such as "Net revenue, year ended December 31, 2024". Give box_2d around the quote '
     "as [ymin, xmin, ymax, xmax] on a 0-1000 scale."
+)
+
+CHECK_TIMEOUT_MS = 30_000  # the slowest of 87 checks in the 2026-11-06 eval took 19.6 s
+# Worded as in the 2026-11-06 run that chose this check; rewording it means running that eval again.
+CHECK_INSTRUCTION = (
+    "You check whether a quote appears on a page image. Set present to true only if the exact text appears on the "
+    "page, character for character: a different digit, a missing or extra digit, or a number that only looks similar "
+    "means false. If present, give box_2d around the quote as [ymin, xmin, ymax, xmax] on a 0-1000 scale; otherwise "
+    "give [0, 0, 0, 0]."
 )
 
 ROUTER_INSTRUCTION = routing.TASK + " " + " ".join(f"{label}: {text}" for label, text in routing.CRITERIA.items())
@@ -42,6 +51,11 @@ class Citation(BaseModel):
 class ModelAnswer(BaseModel):
     answer: str
     citations: list[Citation]
+
+
+class QuoteCheck(BaseModel):
+    present: bool
+    box_2d: list[int] = Field(min_length=4, max_length=4)
 
 
 def _embed(content: str | types.Part) -> list[float]:
@@ -96,3 +110,20 @@ def ask_model(question: str, pages: list[tuple[int, bytes]]) -> ModelAnswer:
         ),
     )
     return ModelAnswer.model_validate_json(response.text or "")
+
+
+def find_quote(png: bytes, quote: str) -> list[int] | None:
+    """Ask, in a call of its own, whether the page image shows the quote; return its box_2d, or None when it does not.
+    Raises ValidationError if the reply is empty or does not fit QuoteCheck."""
+    response = client.models.generate_content(
+        model=config.FLASH_MODEL,
+        contents=[types.Part.from_bytes(data=png, mime_type="image/png"), f'Quote: "{quote}"'],
+        config=types.GenerateContentConfig(
+            system_instruction=CHECK_INSTRUCTION,
+            response_mime_type="application/json",
+            response_schema=QuoteCheck,
+            http_options=types.HttpOptions(timeout=CHECK_TIMEOUT_MS),
+        ),
+    )
+    check = QuoteCheck.model_validate_json(response.text or "")
+    return check.box_2d if check.present else None
