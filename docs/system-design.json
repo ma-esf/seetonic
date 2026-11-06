@@ -66,7 +66,7 @@
       "id": "typesafe", "type": "external", "label": "Jev on TypeSafe", "sublabel": "jev-1.13.0 · no EU region",
       "pos": [40, 220], "size": [150, 60],
       "sources": [
-        { "path": "app/jev.py", "line": 8, "end_line": 13, "label": "api.typesafe.ai, may leave the EU" },
+        { "path": "app/jev.py", "line": 6, "end_line": 10, "label": "api.typesafe.ai, may leave the EU" },
         { "path": "app/config.py", "line": 16, "end_line": 16, "label": "JEV_MODEL" }
       ]
     },
@@ -74,17 +74,17 @@
       "id": "jev", "type": "backend", "label": "jev.py", "sublabel": "TypeSafe client · httpx",
       "pos": [350, 220], "size": [150, 60],
       "sources": [
-        { "path": "app/jev.py", "line": 11, "end_line": 13, "label": "Bearer key, 2 s timeouts" },
-        { "path": "app/jev.py", "line": 43, "end_line": 53, "label": "label_question" }
+        { "path": "app/jev.py", "line": 8, "end_line": 10, "label": "Bearer key, 2 s timeouts" },
+        { "path": "app/jev.py", "line": 26, "end_line": 36, "label": "label_question" }
       ]
     },
     {
       "id": "gemini", "type": "backend", "label": "gemini.py", "sublabel": "embed · route · answer",
       "pos": [770, 220], "size": [150, 60],
       "sources": [
-        { "path": "app/gemini.py", "line": 54, "end_line": 68, "label": "embed page image or question" },
-        { "path": "app/gemini.py", "line": 71, "end_line": 85, "label": "route_question: label or blocked" },
-        { "path": "app/gemini.py", "line": 88, "end_line": 102, "label": "ask_model: answer + citations" }
+        { "path": "app/gemini.py", "line": 47, "end_line": 63, "label": "embed page image or question" },
+        { "path": "app/gemini.py", "line": 66, "end_line": 80, "label": "route_question: label or blocked" },
+        { "path": "app/gemini.py", "line": 83, "end_line": 98, "label": "ask_model: answer + citations" }
       ]
     },
     {

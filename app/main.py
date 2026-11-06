@@ -72,8 +72,8 @@ def ask(body: Question) -> dict:
             log_question(body, start, flash_label, jev_label, [], [])
             return {"answer": REFUSAL, "pages": [], "citations": [], **labels}
         vector = gemini.embed_text(body.question)
-    except (APIError, ValidationError, httpx.HTTPError):
-        raise HTTPException(502, "The model is unavailable. Ask again.")
+    except (APIError, ValidationError, ValueError, httpx.HTTPError):
+        raise HTTPException(502, "The model gave no usable reply. Ask again.")
     scored = store.search_pages(body.doc_id, vector, config.TOP_K)
     if not scored:
         raise HTTPException(404, "No pages are stored for this document.")
