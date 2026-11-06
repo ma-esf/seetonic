@@ -22,13 +22,13 @@
         "id": "ask",
         "label": "Ask a question",
         "focus": ["ui", "main", "jev", "typesafe", "gemini", "vertex", "store", "bq_pages", "gcs", "verify", "pdf", "bq_questions"],
-        "note": "Label the question, search the top 3 pages, Flash answers from their images, PyMuPDF checks quotes, snippets saved, row logged."
+        "note": "Label the question, search the top 3 pages, Flash answers from their images, PyMuPDF checks quotes, Jev looks for any it cannot find, snippets saved, row logged."
       },
       {
         "id": "refusal",
         "label": "Routing and refusal",
         "focus": ["main", "jev", "typesafe", "secrets", "gemini", "vertex", "store", "bq_questions"],
-        "note": "A safety block or an attack label from either model returns a fixed refusal, which is still logged. Jev sees only the question."
+        "note": "A safety block or an attack label from either model returns a fixed refusal, which is still logged. For routing, Jev sees only the question."
       },
       {
         "id": "serve",
@@ -51,7 +51,7 @@
       "sources": [
         { "path": "deploy.sh", "line": 37, "end_line": 37, "label": "secret mounted as TYPESAFE_API_KEY" },
         { "path": "setup.sh", "line": 38, "end_line": 40, "label": "secretAccessor for seetonic-run" },
-        { "path": "app/config.py", "line": 17, "end_line": 18, "label": "read from the environment" }
+        { "path": "app/config.py", "line": 19, "end_line": 20, "label": "read from the environment" }
       ]
     },
     {
@@ -63,19 +63,20 @@
       ]
     },
     {
-      "id": "typesafe", "type": "external", "label": "Jev on TypeSafe", "sublabel": "jev-1.13.0 · no EU region",
+      "id": "typesafe", "type": "external", "label": "Jev on TypeSafe", "sublabel": "jev-1.13.0, jev-1.14.0 · no EU region",
       "pos": [40, 220], "size": [150, 60],
       "sources": [
-        { "path": "app/jev.py", "line": 6, "end_line": 10, "label": "api.typesafe.ai, may leave the EU" },
-        { "path": "app/config.py", "line": 16, "end_line": 16, "label": "JEV_MODEL" }
+        { "path": "app/jev.py", "line": 8, "end_line": 12, "label": "api.typesafe.ai, may leave the EU" },
+        { "path": "app/config.py", "line": 16, "end_line": 18, "label": "JEV_MODEL and JEV_BOX_MODEL" }
       ]
     },
     {
       "id": "jev", "type": "backend", "label": "jev.py", "sublabel": "TypeSafe client · httpx",
       "pos": [350, 220], "size": [150, 60],
       "sources": [
-        { "path": "app/jev.py", "line": 8, "end_line": 10, "label": "Bearer key, 2 s timeouts" },
-        { "path": "app/jev.py", "line": 26, "end_line": 36, "label": "label_question" }
+        { "path": "app/jev.py", "line": 10, "end_line": 12, "label": "Bearer key, 2 s timeouts" },
+        { "path": "app/jev.py", "line": 28, "end_line": 38, "label": "label_question" },
+        { "path": "app/jev.py", "line": 74, "end_line": 97, "label": "find_quote: noul + box on a page image" }
       ]
     },
     {
@@ -101,8 +102,8 @@
       "pos": [350, 360], "size": [570, 64],
       "sources": [
         { "path": "app/main.py", "line": 27, "end_line": 49, "label": "POST /upload" },
-        { "path": "app/main.py", "line": 52, "end_line": 102, "label": "POST /ask" },
-        { "path": "app/main.py", "line": 127, "end_line": 140, "label": "GET /files and the static mount" }
+        { "path": "app/main.py", "line": 52, "end_line": 104, "label": "POST /ask" },
+        { "path": "app/main.py", "line": 149, "end_line": 162, "label": "GET /files and the static mount" }
       ]
     },
     {
@@ -127,7 +128,8 @@
       "sources": [
         { "path": "app/pdf.py", "line": 4, "end_line": 18, "label": "page_count: reject bad PDFs" },
         { "path": "app/pdf.py", "line": 21, "end_line": 27, "label": "render_page to PNG" },
-        { "path": "app/pdf.py", "line": 30, "end_line": 40, "label": "crop a snippet" }
+        { "path": "app/pdf.py", "line": 30, "end_line": 36, "label": "shrink_to_fit for Jev" },
+        { "path": "app/pdf.py", "line": 39, "end_line": 49, "label": "crop a snippet" }
       ]
     },
     {
@@ -144,7 +146,7 @@
       "pos": [770, 500], "size": [150, 60],
       "sources": [
         { "path": "app/verify.py", "line": 25, "end_line": 65, "label": "verify_citation" },
-        { "path": "app/main.py", "line": 88, "end_line": 99, "label": "called per citation" }
+        { "path": "app/main.py", "line": 88, "end_line": 101, "label": "called per citation" }
       ]
     },
     {
@@ -153,7 +155,7 @@
       "sources": [
         { "path": "setup.sh", "line": 42, "end_line": 46, "label": "bucket in DATA_LOCATION" },
         { "path": "app/main.py", "line": 45, "end_line": 47, "label": "source.pdf and pages/N.png" },
-        { "path": "app/main.py", "line": 96, "end_line": 97, "label": "snippets/ written on /ask" }
+        { "path": "app/main.py", "line": 98, "end_line": 99, "label": "snippets/ written on /ask" }
       ]
     },
     {
@@ -171,7 +173,7 @@
       "sources": [
         { "path": "setup.sh", "line": 53, "end_line": 57, "label": "questions table" },
         { "path": "app/store.py", "line": 44, "end_line": 50, "label": "streaming insert, 5 s cap" },
-        { "path": "app/main.py", "line": 105, "end_line": 124, "label": "log row; failure goes to stderr" }
+        { "path": "app/main.py", "line": 127, "end_line": 146, "label": "log row; failure goes to stderr" }
       ]
     }
   ],
@@ -200,9 +202,9 @@
   "connections": [
     { "id": "ui-main", "from": "ui", "to": "main", "label": "upload · ask · files", "variant": "emphasis" },
     { "id": "scripts-main", "from": "scripts", "to": "main", "label": "HTTPS" },
-    { "id": "main-jev", "from": "main", "to": "jev", "label": "label question" },
+    { "id": "main-jev", "from": "main", "to": "jev", "label": "label question · find quote" },
     { "id": "main-gemini", "from": "main", "to": "gemini", "label": "embed · route · answer", "variant": "emphasis" },
-    { "id": "jev-typesafe", "from": "jev", "to": "typesafe", "label": "question text", "variant": "security" },
+    { "id": "jev-typesafe", "from": "jev", "to": "typesafe", "label": "question text · page images", "variant": "security" },
     { "id": "gemini-vertex", "from": "gemini", "to": "vertex", "label": "page images, question" },
     { "id": "secrets-jev", "from": "secrets", "to": "jev", "label": "API key (env)", "variant": "security" },
     { "id": "build-main", "from": "build", "to": "main", "label": "new revision", "variant": "dashed" },
@@ -236,7 +238,7 @@
       "items": [
         "Cloud Run, Cloud Storage and BigQuery run in europe-north1",
         "Gemini is called through the eu multi-region endpoint",
-        "Only the question text goes to Jev; TypeSafe names no EU region"
+        "The question text, and page images of quotes code cannot place, go to Jev; TypeSafe names no EU region"
       ]
     },
     {

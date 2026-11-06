@@ -14,6 +14,8 @@ LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "eu")
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "gemini-embedding-2")
 FLASH_MODEL = os.environ.get("FLASH_MODEL", "gemini-3.8-flash")
 JEV_MODEL = os.environ.get("JEV_MODEL", "jev-1.13.0")
+# Box questions need jev-1.14.0 or later; routing stays on JEV_MODEL so its labels do not shift.
+JEV_BOX_MODEL = os.environ.get("JEV_BOX_MODEL", "jev-1.14.0")
 # Cloud Run reads it from Secret Manager; empty is enough for the tests.
 TYPESAFE_API_KEY = os.environ.get("TYPESAFE_API_KEY", "")
 # Page PNGs keep the DPI they were uploaded at: changing it misplaces highlights and snippets on documents already
