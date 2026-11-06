@@ -34,7 +34,7 @@ def load_file(path: str) -> bytes:
 
 def insert_pages(rows: list[dict]) -> None:
     # A load job, not a streaming insert: it writes all rows or none, so the table never holds half a document.
-    # setup.sh owns the schema: the load uses the table's own schema and never creates the table.
+    # setup.sh owns the schema, so the load never guesses columns or creates the table.
     job_config = bigquery.LoadJobConfig(
         autodetect=False, create_disposition=bigquery.CreateDisposition.CREATE_NEVER
     )
@@ -42,10 +42,9 @@ def insert_pages(rows: list[dict]) -> None:
 
 
 def log_question(row: dict) -> None:
-    # A streaming insert: a load job per question would use up the daily load-job quota. The 5 s retry deadline
-    # plus the 5 s request timeout cap this near 10 s; the default retry runs 600 s, past Cloud Run's 300 s timeout.
+    # Give up within 10 s: with the default 600 s retry, a slow BigQuery would hold /ask past Cloud Run's 300 s
+    # timeout and lose the user's answer.
     errors = bq.insert_rows_json(QUESTIONS_TABLE, [row], retry=bigquery.DEFAULT_RETRY.with_timeout(5), timeout=5)
-    # Row-level insertion errors are returned rather than raised; API and transport failures can still raise.
     if errors:
         raise RuntimeError(f"BigQuery rejected the question row: {errors}")
 

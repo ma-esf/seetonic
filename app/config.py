@@ -1,7 +1,7 @@
-"""Every setting, read from the environment with a default.
+"""Every setting, read from the environment with a default, except the two embedding settings, which are fixed here.
 
-deploy.sh repeats these defaults, setup.sh repeats the project and storage ones, and scripts/evaluate.py repeats
-TOP_K: change them there too.
+deploy.sh repeats the environment defaults, setup.sh repeats the project and storage ones, and scripts/evaluate.py
+repeats TOP_K: change them there too.
 """
 
 import os
@@ -9,9 +9,10 @@ import os
 PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "seetonic-demo")
 # The eu endpoint keeps Gemini calls inside the EU.
 LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "eu")
-# Stored page vectors only compare with question vectors from the same model and EMBEDDING_SIZE: changing either
-# means uploading every document again.
-EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "gemini-embedding-2")
+# Not read from the environment: stored page vectors only compare with question vectors from the same model and
+# size, so changing either means uploading every document again.
+EMBEDDING_MODEL = "gemini-embedding-2"
+EMBEDDING_SIZE = 768
 FLASH_MODEL = os.environ.get("FLASH_MODEL", "gemini-3.8-flash")
 JEV_MODEL = os.environ.get("JEV_MODEL", "jev-1.13.0")
 # Cloud Run reads it from Secret Manager; empty is enough for the tests.
@@ -20,7 +21,6 @@ TYPESAFE_API_KEY = os.environ.get("TYPESAFE_API_KEY", "")
 # uploaded.
 DPI = int(os.environ.get("DPI", "144"))
 TOP_K = int(os.environ.get("TOP_K", "3"))
-EMBEDDING_SIZE = int(os.environ.get("EMBEDDING_SIZE", "768"))
 # Region of the bucket and the BigQuery dataset. Gemini calls use LOCATION, a multi-region endpoint.
 DATA_LOCATION = os.environ.get("DATA_LOCATION", "europe-north1")
 BUCKET = os.environ.get("BUCKET", f"{PROJECT}-files")

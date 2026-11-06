@@ -140,7 +140,8 @@ uv sync
 Requires Python 3.12+, [uv](https://docs.astral.sh/uv/), the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
 and a TypeSafe API key. There is no local-only mode: a locally running server still uses Cloud Storage, BigQuery,
 Gemini and Jev. `setup.sh` provisions resources in an existing Google Cloud project, and `deploy.sh` deploys the
-service to Cloud Run. Settings are read from environment variables in `app/config.py`.
+service to Cloud Run. Settings are read from environment variables in `app/config.py`, except the embedding model
+and size, which are fixed there.
 
 The deployment keeps at least one Cloud Run instance running to reduce cold-start latency and scales up to two
 instances. Each instance handles one request at a time because PyMuPDF does not support concurrent use from multiple
