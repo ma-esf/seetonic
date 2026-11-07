@@ -79,6 +79,9 @@ h1{font-size:24px;font-weight:600;margin:0 0 4px}
 .trace .note{font-size:12px;color:rgba(49,42,42,.5)}
 .trace .note.ok{color:var(--green-dark);font-weight:600}
 .answer{font-size:14px;line-height:1.5;white-space:pre-wrap;margin:0 0 24px}
+summary.grp-t{cursor:pointer}
+/* A question can hold one long word, such as a URL, that pre-wrap alone would not break. */
+#question-text{overflow-wrap:anywhere}
 .flag{border:1px solid var(--gray);border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer}
 .flag:hover{border-color:rgba(22,163,74,.5)}
 .flag.red{border-color:#fecaca;background:#fef2f2}
@@ -170,6 +173,10 @@ h1{font-size:24px;font-weight:600;margin:0 0 4px}
         <div class="spinwrap sm" id="ask-wait" hidden><div class="spinner"></div><p class="wait">Waiting for the server's reply...</p></div>
         <p class="error" id="ask-error" hidden></p>
         <div class="result" id="result" hidden>
+          <details id="question-block" open>
+            <summary class="grp-t">Question</summary>
+            <p class="answer" id="question-text"></p>
+          </details>
           <div class="grp-t">Answer</div>
           <p class="answer" id="answer"></p>
           <div class="grp-t" id="citations-title"></div>
@@ -317,6 +324,8 @@ const PILL = { verified: "green", approximate: "amber", unverified: "red" };
 $("#ask-form").onsubmit = async e => {
   e.preventDefault();
   const button = $("#ask");
+  // Saved once: the box stays editable during the wait, and the question block must show what was sent.
+  const question = $("#question").value.trim();
   button.disabled = true;
   button.textContent = "Asking...";
   // One message for the whole wait: the reply comes in one piece, so the page cannot tell which step is running.
@@ -327,9 +336,11 @@ $("#ask-form").onsubmit = async e => {
   try {
     const reply = await post("/ask", {
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ doc_id: state.docId, question: $("#question").value.trim() }),
+      body: JSON.stringify({ doc_id: state.docId, question }),
     });
     showAnswer(reply);
+    $("#question-text").textContent = question;
+    $("#question-block").open = true;
   } catch (error) {
     showError($("#ask-error"), error);
   } finally {
