@@ -17,8 +17,7 @@ FLASH_MODEL = os.environ.get("FLASH_MODEL", "gemini-3.8-flash")
 JEV_MODEL = os.environ.get("JEV_MODEL", "jev-1.13.0")
 # Cloud Run reads it from Secret Manager; empty is enough for the tests.
 TYPESAFE_API_KEY = os.environ.get("TYPESAFE_API_KEY", "")
-# Page PNGs keep the DPI they were uploaded at: changing it misplaces highlights and snippets on documents already
-# uploaded.
+# Page PNGs keep the DPI they were uploaded at: changing it misplaces highlights on documents already uploaded.
 DPI = int(os.environ.get("DPI", "144"))
 TOP_K = int(os.environ.get("TOP_K", "3"))
 # Region of the bucket and the BigQuery dataset. Gemini calls use LOCATION, a multi-region endpoint.

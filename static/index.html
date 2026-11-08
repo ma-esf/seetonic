@@ -89,7 +89,6 @@ summary.grp-t{cursor:pointer}
 .flag.on{border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
 .flag .nm{font-size:12px;font-weight:600;line-height:1.2}
 .flag .m{font-size:12px;color:rgba(49,42,42,.7);margin-top:3px;line-height:1.35}
-.snippet{display:block;max-width:100%;margin-top:8px;border:1px solid var(--gray);border-radius:4px}
 .pill{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 6px;border-radius:4px;margin-bottom:5px}
 .pill.green{background:#dcfce7;color:#15803d}
 .pill.amber{background:#fef3c7;color:#b45309}
@@ -388,13 +387,6 @@ function showAnswer(reply) {
       el("div", "nm", citation.label),
       el("div", "m", `Page ${citation.page} · “${citation.quote}”`),
     );
-    if (citation.snippet_url) {
-      const snippet = el("img", "snippet");
-      snippet.alt = `Snippet from page ${citation.page}`;
-      snippet.onerror = () => snippet.remove();
-      snippet.src = citation.snippet_url;
-      card.append(snippet);
-    }
     card.onclick = () => openPanel(index);
     return card;
   }));

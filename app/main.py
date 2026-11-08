@@ -89,14 +89,7 @@ def ask(body: Question) -> dict:
     with pymupdf.open(stream=store.load_file(f"{body.doc_id}/source.pdf"), filetype="pdf") as doc:
         for citation in reply.citations:
             page = doc[citation.page - 1] if citation.page in pngs else None
-            result = verify.verify_citation(page, citation, config.DPI)
-            result["snippet_url"] = None
-            if result["boxes"]:
-                # Use the first box for the snippet; the page view shows all boxes.
-                path = f"{body.doc_id}/snippets/{uuid.uuid4().hex}.png"
-                store.save_file(path, pdf.crop(pngs[citation.page], result["boxes"][0]))
-                result["snippet_url"] = f"/files/{path}"
-            citations.append(result)
+            citations.append(verify.verify_citation(page, citation, config.DPI))
     pages = [{"page": page, "score": score} for page, score in scored]
     log_question(body, start, flash_label, jev_label, pages, [citation["status"] for citation in citations])
     return {"answer": reply.answer, "pages": pages, "citations": citations, **labels}
@@ -126,7 +119,7 @@ def log_question(
 
 @app.get("/files/{path:path}")
 def files(path: str) -> Response:
-    """Serve a page image or a snippet. Only PNGs, so the source PDF is never served."""
+    """Serve a page image. Only PNGs, so the source PDF is never served."""
     if not path.endswith(".png"):
         raise HTTPException(404, "Not found.")
     try:

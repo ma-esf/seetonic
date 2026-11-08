@@ -46,7 +46,7 @@ flowchart LR
         questions[("BigQuery<br/>questions table")]
     end
     secret["Secret Manager"] -.->|"TypeSafe API key"| app
-    app -->|"PDF, page PNGs, snippets"| gcs
+    app -->|"PDF, page PNGs"| gcs
     app -->|"embeddings, vector search"| pages
     app -->|"log each answer or refusal"| questions
     app --->|"embed, label, answer"| gemini["Gemini on Vertex AI<br/>eu endpoint"]
@@ -74,7 +74,7 @@ The pipeline, using the default configuration:
    that it may see only some pages, so it does not present a list as complete. The page shows which pages were read
    and that the answer may leave out content from the other pages.
 5. **Verify.** PyMuPDF searches for each quote on its cited page. Matching regions are mapped to bounding boxes in
-   page-image pixels, and the first box is cropped to produce a snippet.
+   page-image pixels.
 6. **Log.** For each request that returns an answer or fixed response, the service attempts to log the question,
    retrieved pages, citation statuses, latency and routing outputs to BigQuery. Requests ending in an HTTP 404 or 502
    response are not logged. Logging failures are reported without failing the request.
@@ -215,8 +215,7 @@ curl -H 'Content-Type: application/json' \
       "quote": "2 312",
       "label": "Net revenue, year ended December 31, 2024",
       "status": "verified",
-      "boxes": [[412.0, 380.5, 455.3, 398.0]],
-      "snippet_url": "/files/3f2a…/snippets/9c1e….png"
+      "boxes": [[412.0, 380.5, 455.3, 398.0]]
     }
   ],
   "decision": "answer",
@@ -232,7 +231,6 @@ curl -H 'Content-Type: application/json' \
 | `pages` | Retrieved pages with cosine similarity, best first. Empty when refused. |
 | `citations[].status` | See [How it works](#how-it-works). Set by `verify.verify_citation`, not the model. |
 | `citations[].boxes` | Bounding boxes as `[x0, y0, x1, y1]` in page-image pixels at `DPI`, with the origin at the top left. One per matched text line, or a model-estimated box for `approximate` citations. Empty when `unverified`. |
-| `citations[].snippet_url` | A crop of the first box, or `null`. |
 | `decision` | `answer`, or the reason for a refusal: `blocked` or `attack`. |
 | `route` | Flash's classification, or `blocked` if Gemini's safety filter blocked the question. |
 | `jev_route`, `jev_confidence` | Jev's label and confidence. |
@@ -245,8 +243,8 @@ schema. A request that returns 502 can be retried.
 
 ### `GET /files/{path}`
 
-Serves a page image at `/files/<doc_id>/pages/<page>.png` or a snippet at its `snippet_url`. Only PNGs are served,
-never the source PDF. Returns HTTP 404 for a non-PNG path or a missing object.
+Serves a page image at `/files/<doc_id>/pages/<page>.png`. Only PNGs are served, never the source PDF. Returns HTTP
+404 for a non-PNG path or a missing object.
 
 ## Contributing
 
