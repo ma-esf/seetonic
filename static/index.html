@@ -407,10 +407,10 @@ function steps(reply) {
   const decided = label => reply.decision !== "answer" && label === reply.decision;
   const note = label => decided(label) ? "✓ decided" : label === "answer" ? "" : "would reject";
   return [
-    { name: "Route", ok: decided(reply.jev_route), note: note(reply.jev_route),
-      value: ["Jev: ", code(reply.jev_route), ` ${reply.jev_confidence.toFixed(2)}`] },
-    { name: "Shadow", ok: decided(reply.route), note: note(reply.route),
-      value: reply.route === "blocked" ? ["Flash: ", code("blocked"), " by the safety filter"] : ["Flash: ", code(reply.route)] },
+    { name: "Jev", ok: decided(reply.jev_route), note: note(reply.jev_route),
+      value: [code(reply.jev_route), ` ${reply.jev_confidence.toFixed(2)}`] },
+    { name: "Flash", ok: decided(reply.route), note: note(reply.route),
+      value: reply.route === "blocked" ? [code("blocked"), " by the safety filter"] : [code(reply.route)] },
   ];
 }
 
