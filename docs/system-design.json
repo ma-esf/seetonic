@@ -22,7 +22,7 @@
         "id": "ask",
         "label": "Ask a question",
         "focus": ["ui", "main", "jev", "typesafe", "gemini", "vertex", "store", "bq_pages", "gcs", "verify", "pdf", "bq_questions"],
-        "note": "Label the question, search the top 3 pages, Flash answers from their images, PyMuPDF checks quotes, snippets saved, row logged."
+        "note": "Label the question, search the top 3 pages, Flash answers from their images, PyMuPDF checks quotes, row logged."
       },
       {
         "id": "refusal",
@@ -101,8 +101,8 @@
       "pos": [350, 360], "size": [570, 64],
       "sources": [
         { "path": "app/main.py", "line": 27, "end_line": 49, "label": "POST /upload" },
-        { "path": "app/main.py", "line": 52, "end_line": 102, "label": "POST /ask" },
-        { "path": "app/main.py", "line": 127, "end_line": 140, "label": "GET /files and the static mount" }
+        { "path": "app/main.py", "line": 52, "end_line": 95, "label": "POST /ask" },
+        { "path": "app/main.py", "line": 120, "end_line": 133, "label": "GET /files and the static mount" }
       ]
     },
     {
@@ -122,12 +122,11 @@
       ]
     },
     {
-      "id": "pdf", "type": "backend", "label": "pdf.py", "sublabel": "validate · render · crop",
+      "id": "pdf", "type": "backend", "label": "pdf.py", "sublabel": "validate · render",
       "pos": [350, 500], "size": [150, 60],
       "sources": [
         { "path": "app/pdf.py", "line": 4, "end_line": 18, "label": "page_count: reject bad PDFs" },
-        { "path": "app/pdf.py", "line": 21, "end_line": 27, "label": "render_page to PNG" },
-        { "path": "app/pdf.py", "line": 30, "end_line": 40, "label": "crop a snippet" }
+        { "path": "app/pdf.py", "line": 21, "end_line": 27, "label": "render_page to PNG" }
       ]
     },
     {
@@ -144,16 +143,15 @@
       "pos": [770, 500], "size": [150, 60],
       "sources": [
         { "path": "app/verify.py", "line": 25, "end_line": 65, "label": "verify_citation" },
-        { "path": "app/main.py", "line": 88, "end_line": 99, "label": "called per citation" }
+        { "path": "app/main.py", "line": 88, "end_line": 92, "label": "called per citation" }
       ]
     },
     {
-      "id": "gcs", "type": "database", "label": "Cloud Storage", "sublabel": "PDF · page PNGs · snippets",
+      "id": "gcs", "type": "database", "label": "Cloud Storage", "sublabel": "PDF · page PNGs",
       "pos": [350, 650], "size": [150, 60],
       "sources": [
         { "path": "setup.sh", "line": 42, "end_line": 46, "label": "bucket in DATA_LOCATION" },
-        { "path": "app/main.py", "line": 45, "end_line": 47, "label": "source.pdf and pages/N.png" },
-        { "path": "app/main.py", "line": 96, "end_line": 97, "label": "snippets/ written on /ask" }
+        { "path": "app/main.py", "line": 45, "end_line": 47, "label": "source.pdf and pages/N.png" }
       ]
     },
     {
@@ -171,7 +169,7 @@
       "sources": [
         { "path": "setup.sh", "line": 53, "end_line": 57, "label": "questions table" },
         { "path": "app/store.py", "line": 44, "end_line": 50, "label": "streaming insert, 5 s cap" },
-        { "path": "app/main.py", "line": 105, "end_line": 124, "label": "log row; failure goes to stderr" }
+        { "path": "app/main.py", "line": 98, "end_line": 117, "label": "log row; failure goes to stderr" }
       ]
     }
   ],
@@ -206,7 +204,7 @@
     { "id": "gemini-vertex", "from": "gemini", "to": "vertex", "label": "page images, question" },
     { "id": "secrets-jev", "from": "secrets", "to": "jev", "label": "API key (env)", "variant": "security" },
     { "id": "build-main", "from": "build", "to": "main", "label": "new revision", "variant": "dashed" },
-    { "id": "main-pdf", "from": "main", "to": "pdf", "label": "render · crop" },
+    { "id": "main-pdf", "from": "main", "to": "pdf", "label": "render" },
     { "id": "main-store", "from": "main", "to": "store", "label": "save · load · search · log", "variant": "emphasis" },
     { "id": "main-verify", "from": "main", "to": "verify", "label": "check quotes" },
     { "id": "store-gcs", "from": "store", "to": "gcs", "label": "PDF · PNGs" },
