@@ -22,6 +22,8 @@ Live: <https://seetonic-v77e2oesjq-lz.a.run.app>
 - [Install](#install)
 - [Usage](#usage)
 - [Tests](#tests)
+- [Design decisions](#design-decisions)
+- [Limitations](#limitations)
 - [API](#api)
 - [Contributing](#contributing)
 - [License](#license)
@@ -86,6 +88,17 @@ Citation statuses:
 | `verified` | The quote matched the cited page's text layer, with word and number boundary checks. Bounding boxes come from the PDF. |
 | `approximate` | The page has no searchable text layer, so a model-estimated bounding box is shown. The quote has not been text-verified. |
 | `unverified` | A text-layer search failed, the cited page was not retrieved, or a page without searchable text has no usable model-estimated box after clipping to the page boundaries. No highlight is shown. |
+
+The match is exact apart from formatting, and `tests/test_verify.py` pins each rule:
+
+1. Runs of whitespace collapse to one space, in the quote and in the page text, and the case of ASCII letters is
+   ignored.
+2. A thousands separator may be a plain, thin (U+2009) or narrow no-break (U+202F) space, so "2 312" in the quote
+   matches any of them on the page.
+3. A word hyphenated at a line end is joined, and a ligature such as "ﬁ" is split into its letters, through PyMuPDF's
+   `TEXTFLAGS_SEARCH`.
+4. The quote may not cut a longer word or number short: "2,312" does not verify against "12,312" or "2,312.5".
+5. A quote over two lines gets one box per line, and a rotated page gets its boxes on the rotated image.
 
 Verification checks whether the quoted text can be matched on the cited page. It does not check whether the quote
 supports the answer or whether the citation's label is correct.
@@ -178,6 +191,77 @@ uv run pytest
 
 The tests replace external model and cloud calls with test doubles, so they require no credentials. They cover
 citation verification, PDF validation, routing and logging in `/ask`, and the evaluation metrics.
+
+## Design decisions
+
+| Decision | Alternative | Why | Cost accepted |
+|---|---|---|---|
+| Retrieve whole pages, embedded as images | OCR or layout parsing into text chunks | OCR and layout parsing are brittle on tables, charts and scans, where answers often are. In the first spike, image-only retrieval ranked both dense-text test pages first, so the planned fallback of also embedding page text was dropped. | A page is a coarse unit: both retrieval misses in [Evaluation](#evaluation) picked a neighbouring page. |
+| 768 embedding dimensions | 1536 or 3072 | Less storage and faster search. The vectors come back with norm 1.0, so cosine similarity equals their dot product. | The quality difference was not measured. |
+| Exact `VECTOR_SEARCH` in BigQuery | An IVF or TreeAH vector index | The `doc_id` filter leaves at most 50 rows to compare, so exact search is fast enough and loses no recall. An index is the path to scale. | Every question runs a BigQuery query job, billed for the whole `pages` table (see [Limitations](#limitations)). |
+| Structured output, validated by Pydantic | JSON asked for in the prompt and parsed from free text | Code reads the output, not a person. Verification needs page, quote and box as typed fields, and a malformed reply should fail loudly (502) rather than be half parsed. | A reply that breaks the schema costs the user a retry. |
+| Code checks every citation | Trust the model's citations | A model can cite a page or "quote" a sentence that is not there, and in regulated settings an answer you cannot trace is not usable. | Exact matching only: a reworded quote is unverified. |
+| Refuse only a question Gemini's safety filter blocks or either model labels `attack` | Refuse every label but `answer`, with Jev deciding and Flash able to veto | Both routers see only the question, not the document, so a wrong `clarify` or `off_topic` would hide an answer the pages hold: Jev once labeled "What is gross margin?" `off_topic` at 0.93. Those two labels are only shown, as "would reject". A blocked or attack question still never reaches the answer model. | Two routing calls on every question, and an off-topic question still gets a full answer call (see [Limitations](#limitations)). |
+| Gemini on the `eu` endpoint, data in `europe-north1` | The `global` endpoint | Google can serve a `global` request outside the EU. Flash has no single-region endpoint, and `global` is not a valid bucket or dataset location, so the data gets its own EU region. | Every question also goes to TypeSafe, which names no EU region. That was accepted to have a dedicated decision model. |
+| Plain SDK and `httpx` calls | LangChain or LlamaIndex, or TypeSafe's SDK | Every step stays visible and explainable. TypeSafe's SDK would add three packages, hide the request and bring retries that do not fit a 2-second budget. | More code written by hand. |
+| API models on a CPU-only Cloud Run service | Self-hosted ColPali or ColQwen on GPUs | No GPU quota risk, and a much smaller system to learn and run. | Two external providers on every question's path. |
+| A load job for page rows, a streaming insert for log rows | One write method for both | A load job writes all of a document's rows or none. A load job per question would use up the daily load-job quota. | A failed log write loses the row: it is printed to stderr and the answer is still returned. |
+| `--concurrency 1` | Cloud Run's default concurrency of 80 | PyMuPDF does not support threads, and FastAPI runs the plain `def` routes on a thread pool. | With `--max-instances 2`, normally at most two requests run at once across the whole service; Cloud Run can briefly exceed the instance limit. |
+| `vertexai=True` set in code | Let the environment pick the Gemini backend | Neither `GOOGLE_GENAI_USE_VERTEXAI` nor an API key in the environment can move calls off Vertex AI. | None. |
+
+## Limitations
+
+**Scope.**
+
+1. One PDF per question, with no chat memory, follow-ups or streaming, and no login or users.
+2. Uploads over 50 pages, password-protected PDFs and non-PDF files are rejected with 400. On Cloud Run, a request is
+   also capped at 32 MiB, the HTTP/1 limit, before the page check runs.
+
+**What a status proves.**
+
+3. "Verified" is a string match: it does not check that the quote supports the claim, and nothing checks that every
+   claim has a citation. An uncited claim does not lower the verified-citation share in [Evaluation](#evaluation).
+4. "Approximate" applies only to a page with no text at all, and its box is the model's, unchecked. A correct quote
+   from an image on a page that also has some text comes back unverified.
+5. Matching is exact apart from formatting. Case is ignored for ASCII only ("FÖR" does not match "för"), a compound
+   word with a real hyphen at a line end ("long-" then "term") does not match, and a reworded quote does not match.
+6. A verified quote is highlighted at every occurrence on its page, matches inside longer numbers included, and its
+   snippet shows the first line of the first match, which may not be the place the model meant.
+
+**Routing.**
+
+7. Only a safety block or an `attack` label refuses a question. An off-topic question such as "Write me a poem" costs an
+   embedding, a vector search and an answer call over three page images, and it is the answer model, told to say so
+   when nothing on the pages relates, that turns it down.
+
+**Failure handling.**
+
+8. Jev is a hard dependency: a TypeSafe error, timeout or unexpected reply fails `/ask` with 502 before Flash runs.
+   Its 2-second `httpx` timeout applies to each connect, read, write and pool phase, not to the whole call.
+9. Each Gemini call times out after 60 seconds with no retry, and `/ask` then answers 502. The limit applies to each
+   call, not to the request, and `/ask` makes three Gemini calls in turn. A safety block or a cut-off reply on the
+   answer call is reported as "did not fit the citation format".
+10. Upload embeds the pages one after another inside the request. A model failure stores nothing but returns a bare
+    500, not the 502 that `/ask` gives. A Cloud Storage or BigQuery failure after the first write leaves files that
+    are never cleaned up.
+11. With concurrency 1 and 2 instances, the service normally handles at most 2 requests at once, page images included.
+    A further request waits about 10 seconds for a free instance, then gets 429.
+
+**Data and access.**
+
+12. Anyone who can reach the service and has a document's random id can ask about it and fetch its page images and
+    snippets. The source PDF itself is never served.
+13. Nothing is deleted. The PDFs, the page images, a new snippet for every highlighted citation on every question, and
+    the question text in BigQuery have no lifecycle rule or expiration.
+14. Each question's text goes to TypeSafe, which names no EU region. Documents, images, embeddings and logs stay in
+    `europe-north1`, and Gemini calls use the `eu` endpoint.
+
+**Monitoring and cost.**
+
+15. Only `/ask` replies with status 200 get a row in the `questions` table. Errors and uploads leave none, and the 502
+    handlers do not log the cause; Cloud Run's request log still has the status codes.
+16. With no partitioning on the `pages` table, each search is billed for the bytes of the whole table under on-demand
+    pricing, although it compares only one document's rows.
 
 ## API
 
