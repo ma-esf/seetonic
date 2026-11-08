@@ -229,7 +229,7 @@ curl -H 'Content-Type: application/json' \
 |---|---|
 | `answer` | The generated answer, or a fixed refusal. |
 | `pages` | Retrieved pages with cosine similarity, best first. Empty when refused. |
-| `citations[].status` | See [How it works](#how-it-works). Set by `verify.verify_citation`, not the model. |
+| `citations[].status` | See [Pipeline details](#pipeline-details). Set by `verify.verify_citation`, not the model. |
 | `citations[].boxes` | Bounding boxes as `[x0, y0, x1, y1]` in page-image pixels at `DPI`, with the origin at the top left. One per matched text line, or a model-estimated box for `approximate` citations. Empty when `unverified`. |
 | `decision` | `answer`, or the reason for a refusal: `blocked` or `attack`. |
 | `route` | Flash's classification, or `blocked` if Gemini's safety filter blocked the question. |
