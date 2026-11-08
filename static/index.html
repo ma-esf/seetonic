@@ -359,7 +359,7 @@ function scopeLine(pages) {
   if (!pages.length) return "";
   const numbers = pages.map(p => p.page).sort((a, b) => a - b);
   const list = numbers.length === 1 ? String(numbers[0]) : `${numbers.slice(0, -1).join(", ")} and ${numbers.at(-1)}`;
-  const read = `Read from ${numbers.length === 1 ? "page" : "pages"} ${list} of ${state.pageCount}.`;
+  const read = `Read from ${numbers.length === 1 ? "page" : "pages"} ${list}.`;
   return numbers.length < state.pageCount ? `${read} The other pages were not read, so the answer may leave things out.` : read;
 }
 
