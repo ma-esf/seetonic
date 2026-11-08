@@ -311,8 +311,7 @@ $("#upload").onclick = async () => {
     const reply = await post("/upload", { body: form });
     state.docId = reply.doc_id;
     state.pageCount = reply.pages;
-    // /upload stores every page or fails, so a reply means all of them were rendered, indexed and stored.
-    $("#doc-line").textContent = `${state.file.name}: ${reply.pages} ${reply.pages === 1 ? "page" : "pages"} rendered, indexed for search and stored.`;
+    $("#doc-line").textContent = `${state.file.name} · ${reply.pages} ${reply.pages === 1 ? "page" : "pages"}`;
     show("ask");
     $("#question").focus();
   } catch (error) {
