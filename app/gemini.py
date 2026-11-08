@@ -14,7 +14,9 @@ client = genai.Client(
 )
 
 INSTRUCTION = (
-    "Answer the question using only the page images. If nothing on the pages relates to the question, say so and "
+    "Answer the question using only the page images. These may be only some pages of the document, so present what "
+    "you find as what these pages show, never as complete for the whole document. "
+    "If nothing on the pages relates to the question, say so and "
     "give no citations. If the question is loosely worded, answer its most likely meaning from the pages. Each "
     'image follows a label "Page N"; cite that N as the page. For each claim, copy the exact words from the page as '
     "the quote, "

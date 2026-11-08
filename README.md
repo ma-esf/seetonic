@@ -70,7 +70,9 @@ The pipeline, using the default configuration:
    screened by the routing models; uploaded page content is passed to the answer model without this screening.
 3. **Retrieve.** Embed the question as text and use BigQuery `VECTOR_SEARCH` to retrieve up to three pages with the
    smallest cosine distance. The search is exact over the document's page embeddings; it does not use a vector index.
-4. **Answer.** Flash receives the retrieved page images and returns an answer and citations as JSON.
+4. **Answer.** Flash receives the retrieved page images and returns an answer and citations as JSON. It is told
+   that it may see only some pages, so it does not present a list as complete. The page shows which pages were read
+   and that the answer may leave out content from the other pages.
 5. **Verify.** PyMuPDF searches for each quote on its cited page. Matching regions are mapped to bounding boxes in
    page-image pixels, and the first box is cropped to produce a snippet.
 6. **Log.** For each request that returns an answer or fixed response, the service attempts to log the question,
